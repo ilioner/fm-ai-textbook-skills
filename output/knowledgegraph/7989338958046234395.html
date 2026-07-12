@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>知识图谱预览</title>
+<style>
+  :root {
+    --bg: #0f1420;
+    --panel: #171d2b;
+    --panel-2: #1e2637;
+    --line: #2a3548;
+    --text: #e6ebf5;
+    --muted: #8a97ad;
+    --l0: #f5a623;
+    --l1: #4a9eff;
+    --l2: #35d0a5;
+    --accent: #6c8cff;
+    --shadow: 0 6px 24px rgba(0,0,0,.35);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+  }
+  header {
+    padding: 14px 22px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    flex-shrink: 0;
+    box-shadow: var(--shadow);
+    z-index: 10;
+  }
+  header h1 { font-size: 17px; font-weight: 600; letter-spacing: .5px; }
+  header .meta { font-size: 12px; color: var(--muted); display: flex; gap: 14px; }
+  header .meta b { color: var(--text); font-weight: 500; }
+  .switcher { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .switcher select {
+    background: var(--panel-2);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 7px 12px;
+    font-size: 13px;
+    outline: none;
+    cursor: pointer;
+  }
+  .layout { flex: 1; display: flex; min-height: 0; }
+  .canvas-wrap {
+    flex: 1;
+    overflow: auto;
+    position: relative;
+    background:
+      radial-gradient(circle at 1px 1px, rgba(255,255,255,.035) 1px, transparent 0);
+    background-size: 22px 22px;
+  }
+  #canvas { position: relative; }
+  svg.edges { position: absolute; top: 0; left: 0; pointer-events: none; overflow: visible; }
+  .node {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 10px 14px;
+    border-radius: 12px;
+    background: var(--panel-2);
+    border: none;
+    cursor: pointer;
+    transition: transform .12s, box-shadow .12s;
+    max-width: 230px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.25);
+  }
+  .node:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+  .node.selected { box-shadow: 0 0 0 2px var(--accent), var(--shadow); }
+  .node .label { font-size: 14px; font-weight: 600; line-height: 1.35; }
+  .node .badges { display: flex; flex-wrap: wrap; gap: 5px; }
+  .badge {
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 20px;
+    background: rgba(255,255,255,.08);
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .badge.tag { background: rgba(245,166,35,.18); color: var(--l0); }
+  .node .label { display: flex; align-items: flex-start; gap: 7px; }
+  .node .dot {
+    flex-shrink: 0; width: 9px; height: 9px; border-radius: 50%;
+    margin-top: 4px;
+  }
+  .node[data-level="0"] .dot { background: var(--l0); }
+  .node[data-level="1"] .dot { background: var(--l1); }
+  .node[data-level="2"] .dot { background: var(--l2); }
+  .node .toggle {
+    position: absolute;
+    right: -11px; top: 50%;
+    transform: translateY(-50%);
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 13px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    z-index: 3;
+  }
+  .node .toggle:hover { color: var(--text); border-color: var(--accent); }
+  .detail {
+    width: 380px;
+    flex-shrink: 0;
+    background: var(--panel);
+    border-left: 1px solid var(--line);
+    overflow-y: auto;
+    padding: 22px;
+  }
+  .detail.empty { display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 13px; text-align: center; }
+  .detail h2 { font-size: 18px; margin-bottom: 6px; line-height: 1.4; }
+  .detail .dl { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
+  .detail .chip {
+    font-size: 11px; padding: 3px 9px; border-radius: 20px;
+    background: var(--panel-2); color: var(--muted); border: 1px solid var(--line);
+  }
+  .detail .sec-title {
+    font-size: 12px; color: var(--muted); text-transform: uppercase;
+    letter-spacing: .8px; margin: 18px 0 10px; border-bottom: 1px solid var(--line); padding-bottom: 6px;
+  }
+  .seg {
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+  }
+  .seg .txt { font-size: 13px; line-height: 1.7; color: var(--text); white-space: pre-line; }
+  .seg .hashes { margin-top: 8px; display: flex; flex-direction: column; gap: 3px; }
+  .seg .hash {
+    margin-top: 8px; font-size: 10.5px; color: var(--muted);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    word-break: break-all; display: flex; align-items: center; gap: 6px;
+  }
+  .seg .hash::before { content: "#"; color: var(--l2); font-weight: 700; }
+  .node-hash {
+    font-size: 10.5px; color: var(--muted);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    word-break: break-all; margin-bottom: 4px;
+  }
+  .empty-hint { color: var(--muted); font-size: 12.5px; font-style: italic; }
+  .proj-tag {
+    display: inline-block; font-size: 12px; color: var(--l0);
+    background: rgba(245,166,35,.12); border: 1px solid rgba(245,166,35,.3);
+    padding: 4px 10px; border-radius: 8px; margin-bottom: 10px;
+  }
+  /* 批注编辑区（节点详情面板内） */
+  .cmt-box { margin-top: 6px; }
+  .cmt-box textarea {
+    width: 100%; min-height: 62px; resize: vertical;
+    background: var(--bg); color: var(--text);
+    border: 1px solid var(--line); border-radius: 8px;
+    padding: 9px 11px; font-size: 13px; line-height: 1.6; outline: none;
+    font-family: inherit;
+  }
+  .cmt-box textarea:focus { border-color: var(--accent); }
+  .cmt-actions { display: flex; gap: 8px; margin-top: 8px; align-items: center; }
+  .btn {
+    font-size: 12.5px; padding: 6px 13px; border-radius: 8px; cursor: pointer;
+    border: 1px solid var(--line); background: var(--panel-2); color: var(--text);
+    transition: all .12s;
+  }
+  .btn:hover { border-color: var(--accent); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.ghost { background: transparent; color: var(--muted); }
+  .cmt-saved { font-size: 11.5px; color: var(--l2); }
+  /* 有意见的节点右上角标记 */
+  .node .cmt-flag {
+    position: absolute; left: -7px; top: -7px;
+    width: 18px; height: 18px; border-radius: 50%;
+    background: var(--l0); color: #1a1200; font-size: 11px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 2px 6px rgba(0,0,0,.4); z-index: 4;
+  }
+  /* 底部反馈栏 */
+  .feedback-bar {
+    position: fixed; left: 0; right: 380px; bottom: 0;
+    background: var(--panel); border-top: 1px solid var(--line);
+    padding: 10px 22px; display: flex; align-items: center; gap: 14px;
+    box-shadow: 0 -4px 20px rgba(0,0,0,.3); z-index: 20;
+  }
+  .feedback-bar .fb-page {
+    flex: 1; background: var(--bg); color: var(--text);
+    border: 1px solid var(--line); border-radius: 8px;
+    padding: 8px 12px; font-size: 13px; outline: none; font-family: inherit;
+  }
+  .feedback-bar .fb-page:focus { border-color: var(--accent); }
+  .feedback-bar .fb-count { font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .feedback-bar .fb-count b { color: var(--l0); }
+  .canvas-wrap { padding-bottom: 56px; }
+  .toast {
+    position: fixed; bottom: 70px; left: 50%; transform: translateX(-50%);
+    background: var(--l2); color: #04231a; padding: 10px 20px; border-radius: 10px;
+    font-size: 13px; font-weight: 600; opacity: 0; transition: opacity .25s;
+    pointer-events: none; z-index: 50; box-shadow: var(--shadow);
+  }
+  .toast.show { opacity: 1; }
+  .legend { display: flex; gap: 16px; font-size: 11.5px; color: var(--muted); align-items: center; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>📚 知识图谱预览</h1>
+  <div class="meta" id="meta"></div>
+  <div class="legend">
+    <span><i style="background:var(--l0)"></i>层级0 主题</span>
+    <span><i style="background:var(--l1)"></i>层级1 分类</span>
+    <span><i style="background:var(--l2)"></i>层级2 知识点</span>
+  </div>
+  <div class="switcher" id="switcher" style="display:none">
+    <label style="font-size:12px;color:var(--muted)">选择课程</label>
+    <select id="lessonSelect"></select>
+  </div>
+</header>
+<div class="layout">
+  <div class="canvas-wrap">
+    <div id="canvas">
+      <svg class="edges" id="edges"></svg>
+    </div>
+  </div>
+  <div class="detail empty" id="detail">点击左侧任意节点查看详细内容</div>
+</div>
+
+<div class="feedback-bar">
+  <input class="fb-page" id="pageComment" type="text"
+         placeholder="对本课程的整体修改意见（页面级）…如：空域知识下 6 个子节点顺序需调整" />
+  <span class="fb-count" id="fbCount">未添加意见</span>
+  <button class="btn ghost" id="clearBtn">清空</button>
+  <button class="btn primary" id="copyBtn">📋 复制修改意见</button>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+// 数据由 render.py 注入：数组，每项 { lessonId, meta:{textbookId,unitId,lessonId}, graph:{nodes,edges} }
+const DATASETS = [{"lessonId": "7989338958046234395", "meta": {"lessonId": "7989338958046234395"}, "graph": {"nodes": [{"id": "7989338958046234395", "label": "任务3 空地一体化测绘数据处理", "level": 0, "dataHash": "fm-doc-id-5a212612ffb35635", "displayCode": "UAS_P6T3", "knowledgeCategory": "元认知", "cognitiveDimension": "理解"}, {"id": "7989338958046234395_n1", "label": "概念普及", "level": 1, "dataHash": "fm-doc-id-696c46df08dac2ee", "knowledgeCategory": "概念性", "cognitiveDimension": "理解"}, {"id": "7989338958046234395_n2", "label": "模型修复", "level": 2, "dataHash": "fm-doc-id-cbc4044f0b2c829d", "description": [{"text": "实世界的实体，也可以是虚构的物体。任何自然界存在的东西都可以用三维模型表示。模型修复就是利用专业软件修理扫描完成的模型，将扫描所得的点云数据创建成多边形模型和网络。依据点云数据和图像数据进行专业处理，修补模型上的漏洞，重叠三角形的清理等最终得到一个完整无缺的多边形模型。也有为了有效修补逆向工程得到的三角网格模型中缺失的复杂孔洞，提出一种基于孔洞边界边收缩的修补算法。提取边界边，接着计算与边界点相关的三角面法矢夹角以确定收缩方向，再计算边界边与其相邻边距离的平均值以确定收缩距离，然后收缩边界边并细化得到一条新边界，再根据给出的方法在提取的边界边与收缩得到的边界边之间构造新三角面片。设定终止条件，不断迭代，构造出完整的三角面片，完成模型的修补（图6.3.1）。", "dataHash": "fm-doc-id-80e128deb96cf6b7"}, {"text": "模型修复的功能：\n（1）手动修补模型：在计算机上观察模型时会发现扫描完的模型上存在许多孔洞，不同的修补软件修补孔洞的命令可能会不同，但是操作方式和最终要达成的效果都是大同小异的，即修补模型数据上的孔洞处，得到一个完整的模型，以方便后续的处理。\n（2）自动修补模型：一些软件上有可以自己检测到模型的孔洞处的命令，它会自动选中有问题的地方进行修复，修补模型上的空缺，最终修补出一个完整的模型。\n（3）调整模型的坐标：在三维软件当中，都存在着xyz坐标系，由于扫描数据的坐标随机性，数据导入软件后，坐标系也是随机的。为了提高建造模型的精度，要在修补完模型后进行对齐坐标系的操作，即将扫描数据的坐标系与建模的坐标系对齐。在对齐坐标后，就能更加清楚快捷地查看一个模型的不同角度视图，提高工作效率。", "dataHash": "fm-doc-id-b5b56abfa519db4d", "sourceHashes": [{"text": "模型修复的功能：", "dataHash": "fm-doc-id-b5b56abfa519db4d"}, {"text": "（1）手动修补模型：在计算机上观察模型时会发现扫描完的模型上存在许多孔洞，不同的修补软件修补孔洞的命令可能会不同，但是操作方式和最终要达成的效果都是大同小异的，即修补模型数据上的孔洞处，得到一个完整的模型，以方便后续的处理。", "dataHash": "fm-doc-id-b0823a2941a580ca"}, {"text": "（2）自动修补模型：一些软件上有可以自己检测到模型的孔洞处的命令，它会自动选中有问题的地方进行修复，修补模型上的空缺，最终修补出一个完整的模型。", "dataHash": "fm-doc-id-46bb858f164ae3a7"}, {"text": "（3）调整模型的坐标：在三维软件当中，都存在着xyz坐标系，由于扫描数据的坐标随机性，数据导入软件后，坐标系也是随机的。为了提高建造模型的精度，要在修补完模型后进行对齐坐标系的操作，即将扫描数据的坐标系与建模的坐标系对齐。在对齐坐标后，就能更加清楚快捷地查看一个模型的不同角度视图，提高工作效率。", "dataHash": "fm-doc-id-6402b6e25e14d52d"}]}], "knowledgeCategory": "概念性", "cognitiveDimension": "理解"}, {"id": "7989338958046234395_n3", "label": "模型贴图", "level": 2, "dataHash": "fm-doc-id-d5beefbeaff64c61", "description": [{"text": "模型贴图又称纹理映射或纹理贴图，就是将二维影像映射到高精度三维模型上的过程。贴图是材质应用到表面的一种模板，使用贴图可以模拟纹理，应用设计、反射、折射和其他效果。简单来说，就是把一幅图像贴到三维模型物体的表面上来增强真实感，还原其真实纹理，完善模型造型，使三维模型更接近现实。它也可以和光照计算、图像混合等技术结合起来形成许多非常漂亮的效果。纹理贴图几乎能满足任何制作的需要，只要现实生活中有的，纹理贴图都可以表现。它是靠输入外来的纹理素材来达到制作的目的，是真实感图像制作的一个重要部分。运用它可以方便地制作出极具真实感的图形，而不必花过多时间来考虑物体的表面细节（图6.3.2）。", "dataHash": "fm-doc-id-27f358bfe50b47b7"}], "knowledgeCategory": "概念性", "cognitiveDimension": "理解"}, {"id": "7989338958046234395_n4", "label": "知识拓展", "level": 1, "dataHash": "fm-doc-id-e5b518261517553f", "knowledgeCategory": "概念性", "cognitiveDimension": "理解"}, {"id": "7989338958046234395_n5", "label": "贴图控制点", "level": 2, "dataHash": "fm-doc-id-3e45fbd3541d27d4", "description": [{"text": "贴图控制点也可以叫作贴图对应点。一般地，我们把在全等图形中，互相重合的、相等的边或角对应的点叫作对应点。我们在贴图过程中需要寻找两个区域当中位置一致对应的特征点，使它们完全重合进行贴图映射（图6.3.3）。", "dataHash": "fm-doc-id-b931e10c3ccbaa88"}], "knowledgeCategory": "概念性", "cognitiveDimension": "理解"}, {"id": "7989338958046234395_n6", "label": "纹理处理", "level": 2, "dataHash": "fm-doc-id-383b0229109d49d9", "description": [{"text": "当贴图映射完成后，我们会发现有一些拉伸、模糊的纹理，这个时候需要对这种纹理进行处理，手动处理映射完成的图像，保留清晰、正确的纹理，再对拉伸、碎片、模糊和错误纹理进行删除和局部位置调整，最终达到与原图纹理一致的效果。", "dataHash": "fm-doc-id-a94c203c0b8e4e49"}], "knowledgeCategory": "程序性", "cognitiveDimension": "应用"}, {"id": "7989338958046234395_n7", "label": "羽化", "level": 2, "dataHash": "fm-doc-id-9760d8f66eb4a713", "description": [{"text": "羽化是令选区内外衔接部分虚化，起到渐变的作用，从而达到自然衔接的效果，是PS及其他版本中的处理图片的重要工具。运用过程中，具体的羽化值完全取决于经验。因此，掌握这个工具的关键是经常练习。羽化值越大，虚化范围越宽。羽化值越小，虚化范围越窄。我们可以根据实际情况进行调节。把羽化值设置小一点，反复羽化是羽化的一个技巧（图6.3.4）。", "dataHash": "fm-doc-id-bfbab1b72f127e42"}], "knowledgeCategory": "概念性", "cognitiveDimension": "理解"}], "edges": [{"source": "7989338958046234395", "target": "7989338958046234395_n1", "type": "父子", "description": "任务3 空地一体化测绘数据处理包含概念普及"}, {"source": "7989338958046234395_n1", "target": "7989338958046234395_n2", "type": "父子", "description": "概念普及包含模型修复"}, {"source": "7989338958046234395_n1", "target": "7989338958046234395_n3", "type": "父子", "description": "概念普及包含模型贴图"}, {"source": "7989338958046234395", "target": "7989338958046234395_n4", "type": "父子", "description": "任务3 空地一体化测绘数据处理包含知识拓展"}, {"source": "7989338958046234395_n4", "target": "7989338958046234395_n5", "type": "父子", "description": "知识拓展包含贴图控制点"}, {"source": "7989338958046234395_n4", "target": "7989338958046234395_n6", "type": "父子", "description": "知识拓展包含纹理处理"}, {"source": "7989338958046234395_n4", "target": "7989338958046234395_n7", "type": "父子", "description": "知识拓展包含羽化"}]}}];
+
+const COL_W = 300;      // 层级横向间距
+const NODE_H = 62;      // 单节点占位高度
+const V_GAP = 16;       // 兄弟节点垂直间距
+const canvas = document.getElementById('canvas');
+const edgesSvg = document.getElementById('edges');
+const detail = document.getElementById('detail');
+const metaEl = document.getElementById('meta');
+
+let current = null;      // 当前数据集
+let nodeMap = {};        // id -> node
+let childrenMap = {};    // id -> [childId]
+let elMap = {};          // id -> DOM 元素（用于读取真实坐标画线）
+let collapsed = new Set();
+let selectedId = null;
+
+// 批注存储：按 lessonId 分组。{ [lessonId]: { nodes: {nodeId:{label,level,text}}, page: "" } }
+// 存在内存中（纯静态页，无需后端）。切换 lesson 不丢，复制时汇总所有有意见的 lesson。
+const feedback = {};
+function fbFor(lessonId) {
+  if (!feedback[lessonId]) feedback[lessonId] = { nodes: {}, page: "" };
+  return feedback[lessonId];
+}
+
+function buildTree(graph) {
+  nodeMap = {};
+  childrenMap = {};
+  graph.nodes.forEach(n => { nodeMap[n.id] = n; childrenMap[n.id] = []; });
+  graph.edges.forEach(e => {
+    if (childrenMap[e.source]) childrenMap[e.source].push(e.target);
+  });
+  // 根 = level 0，或无入边的节点
+  const hasParent = new Set(graph.edges.map(e => e.target));
+  return graph.nodes.filter(n => n.level === 0 || !hasParent.has(n.id)).map(n => n.id);
+}
+
+// 递归布局：用节点真实高度 node._h 计算占位，返回子树总高度，写入 node._x/_y。
+// node._y 为该节点顶端 y 坐标；节点垂直居中对齐其子树跨度。
+function layout(id, depth, cursorY) {
+  const node = nodeMap[id];
+  node._x = depth * COL_W;
+  const selfH = (node._h || NODE_H) + V_GAP;
+  const kids = collapsed.has(id) ? [] : childrenMap[id];
+  if (kids.length === 0) {
+    node._y = cursorY;
+    return selfH;
+  }
+  let y = cursorY;
+  let total = 0;
+  kids.forEach(k => {
+    const h = layout(k, depth + 1, y);
+    y += h; total += h;
+  });
+  // 父节点中心对齐首末子节点中心
+  const first = nodeMap[kids[0]];
+  const last = nodeMap[kids[kids.length - 1]];
+  const kidsMid = (first._y + (first._h || NODE_H) / 2 + last._y + (last._h || NODE_H) / 2) / 2;
+  node._y = kidsMid - (node._h || NODE_H) / 2;
+  // 子树可能比父节点自身矮，取较大者
+  return Math.max(total, selfH);
+}
+
+function render() {
+  // 清空旧节点（保留 svg）
+  [...canvas.querySelectorAll('.node')].forEach(n => n.remove());
+  elMap = {};
+  const roots = buildTree(current.graph);
+
+  // —— 阶段一：建节点并入 DOM（先不定位），测量真实高度 ——
+  Object.values(nodeMap).forEach(n => {
+    const el = document.createElement('div');
+    el.className = 'node' + (n.id === selectedId ? ' selected' : '');
+    el.dataset.level = n.level;
+    el.style.visibility = 'hidden';
+
+    const badges = [];
+    if (n.tags) badges.push(`<span class="badge tag">${n.tags}</span>`);
+    if (n.knowledgeCategory) badges.push(`<span class="badge">${n.knowledgeCategory}</span>`);
+    if (n.cognitiveDimension) badges.push(`<span class="badge">${n.cognitiveDimension}</span>`);
+
+    el.innerHTML = `<div class="label"><span class="dot"></span><span>${escapeHtml(n.label)}</span></div>` +
+                   (badges.length ? `<div class="badges">${badges.join('')}</div>` : '');
+
+    const kids = childrenMap[n.id];
+    if (kids && kids.length) {
+      const t = document.createElement('div');
+      t.className = 'toggle';
+      t.textContent = collapsed.has(n.id) ? '+' : '−';
+      t.onclick = (ev) => { ev.stopPropagation(); toggle(n.id); };
+      el.appendChild(t);
+    }
+    // 有意见的节点加标记
+    if (current && fbFor(current.lessonId).nodes[n.id]) {
+      const flag = document.createElement('div');
+      flag.className = 'cmt-flag';
+      flag.textContent = '✎';
+      flag.title = '该节点有修改意见';
+      el.appendChild(flag);
+    }
+    el.onclick = () => select(n.id);
+    canvas.appendChild(el);
+    elMap[n.id] = el;
+  });
+  // 测量真实高度/宽度写入 node._h / node._w
+  Object.values(nodeMap).forEach(n => {
+    n._h = elMap[n.id].offsetHeight;
+    n._w = elMap[n.id].offsetWidth;
+  });
+
+  // —— 阶段二：按真实高度布局 ——
+  let cursorY = 0;
+  roots.forEach(r => { cursorY += layout(r, 0, cursorY); });
+
+  // —— 阶段三：算内容包围盒 ——
+  let contentW = 0, contentH = 0;
+  Object.values(nodeMap).forEach(n => {
+    if (n._x === undefined) return;
+    contentW = Math.max(contentW, n._x + (n._w || 200));
+    contentH = Math.max(contentH, n._y + (n._h || NODE_H));
+  });
+
+  // 居中偏移：内容比视口小时居中，否则留固定边距
+  const wrap = canvas.parentElement;      // .canvas-wrap 视口
+  const PAD = 48;
+  const vw = wrap.clientWidth, vh = wrap.clientHeight;
+  const offsetX = Math.max(PAD, (vw - contentW) / 2);
+  const offsetY = Math.max(PAD, (vh - contentH) / 2);
+
+  // —— 阶段四：定位并显示 ——
+  Object.values(nodeMap).forEach(n => {
+    if (n._x === undefined) return;
+    const el = elMap[n.id];
+    el.style.left = (n._x + offsetX) + 'px';
+    el.style.top = (n._y + offsetY) + 'px';
+    el.style.visibility = 'visible';
+  });
+
+  // canvas 至少填满视口，内容超出时按内容+边距撑开
+  canvas.style.width = Math.max(vw, contentW + offsetX + PAD) + 'px';
+  canvas.style.height = Math.max(vh, contentH + offsetY + PAD) + 'px';
+  // 节点已定位，用真实坐标画线（消除偏移）
+  drawEdges();
+}
+
+function drawEdges() {
+  edgesSvg.innerHTML = '';
+  edgesSvg.setAttribute('width', canvas.style.width);
+  edgesSvg.setAttribute('height', canvas.style.height);
+  current.graph.edges.forEach(e => {
+    if (collapsed.has(e.source)) return;
+    const se = elMap[e.source], te = elMap[e.target];
+    if (!se || !te) return;
+    // 读取真实布局坐标：起点=父节点右边缘中点，终点=子节点左边缘中点
+    const x1 = se.offsetLeft + se.offsetWidth;
+    const y1 = se.offsetTop + se.offsetHeight / 2;
+    const x2 = te.offsetLeft;
+    const y2 = te.offsetTop + te.offsetHeight / 2;
+    const mx = (x1 + x2) / 2;
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`);
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', '#3a4761');
+    path.setAttribute('stroke-width', '1.6');
+    edgesSvg.appendChild(path);
+  });
+}
+
+function toggle(id) {
+  if (collapsed.has(id)) collapsed.delete(id); else collapsed.add(id);
+  render();
+}
+
+function select(id) {
+  selectedId = id;
+  render();
+  const n = nodeMap[id];
+  const chips = [];
+  chips.push(`<span class="chip">层级 ${n.level}</span>`);
+  if (n.knowledgeCategory) chips.push(`<span class="chip">${n.knowledgeCategory}</span>`);
+  if (n.cognitiveDimension) chips.push(`<span class="chip">${n.cognitiveDimension}</span>`);
+  if (n.tags) chips.push(`<span class="chip" style="color:var(--l0)">${n.tags}</span>`);
+
+  let html = '';
+  if (n.projectTitle) {
+    html += `<div class="proj-tag">📁 ${escapeHtml(n.projectTitle)}</div>`;
+  }
+  html += `<h2>${escapeHtml(n.label)}</h2>`;
+  if (n.dataHash) html += `<div class="node-hash"># ${n.dataHash}</div>`;
+  if (n.projectDataHash) html += `<div class="node-hash">项目 # ${n.projectDataHash}</div>`;
+  html += `<div class="dl">${chips.join('')}</div>`;
+
+  const desc = n.description || [];
+  if (desc.length) {
+    html += `<div class="sec-title">详细说明（${desc.length} 段）</div>`;
+    desc.forEach(d => {
+      html += `<div class="seg"><div class="txt">${escapeHtml(d.text)}</div>`;
+      if (d.sourceHashes && d.sourceHashes.length) {
+        // 合并段：列出全部源 hash（零丢失可追溯）
+        html += `<div class="hashes">` +
+          d.sourceHashes.map(s => `<div class="hash">${s.dataHash}</div>`).join('') +
+          `</div>`;
+      } else if (d.dataHash) {
+        html += `<div class="hash">${d.dataHash}</div>`;
+      }
+      html += `</div>`;
+    });
+  } else {
+    html += `<div class="sec-title">详细说明</div><div class="empty-hint">该节点为分类/主题节点，无独立正文说明。</div>`;
+  }
+
+  // 节点级批注编辑区
+  const existing = fbFor(current.lessonId).nodes[id];
+  html += `<div class="sec-title">修改意见（该节点）</div>` +
+    `<div class="cmt-box">` +
+    `<textarea id="nodeCmt" placeholder="写下对「${escapeHtml(n.label)}」的修改意见，例如：该节点应为 level 1 / 应删除 / 归类错误…">${existing ? escapeHtml(existing.text) : ''}</textarea>` +
+    `<div class="cmt-actions">` +
+    `<button class="btn primary" id="saveCmtBtn">保存意见</button>` +
+    (existing ? `<button class="btn ghost" id="delCmtBtn">删除</button><span class="cmt-saved">✓ 已记录</span>` : '') +
+    `</div></div>`;
+
+  detail.className = 'detail';
+  detail.innerHTML = html;
+
+  document.getElementById('saveCmtBtn').onclick = () => {
+    const txt = document.getElementById('nodeCmt').value.trim();
+    const store = fbFor(current.lessonId).nodes;
+    if (txt) {
+      store[id] = { label: n.label, level: n.level, text: txt };
+    } else {
+      delete store[id];
+    }
+    updateFbCount(); render(); select(id);
+    showToast(txt ? '已记录该节点意见' : '已清除该节点意见');
+  };
+  const delBtn = document.getElementById('delCmtBtn');
+  if (delBtn) delBtn.onclick = () => {
+    delete fbFor(current.lessonId).nodes[id];
+    updateFbCount(); render(); select(id);
+    showToast('已删除该节点意见');
+  };
+}
+
+function escapeHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// —— 反馈：计数、生成文本、复制 ——
+function countFeedback() {
+  let n = 0;
+  Object.values(feedback).forEach(f => {
+    n += Object.keys(f.nodes).length;
+    if (f.page && f.page.trim()) n += 1;
+  });
+  return n;
+}
+
+function updateFbCount() {
+  const c = countFeedback();
+  const el = document.getElementById('fbCount');
+  el.innerHTML = c ? `已添加 <b>${c}</b> 条意见` : '未添加意见';
+}
+
+function buildFeedbackText() {
+  // 汇总所有有意见的 lesson；只带定位信息 + 意见（正文由大模型自行读 json 定位）
+  const lines = ['# 知识图谱修改意见', ''];
+  let any = false;
+  Object.keys(feedback).forEach(lessonId => {
+    const f = feedback[lessonId];
+    const nodeIds = Object.keys(f.nodes);
+    const hasPage = f.page && f.page.trim();
+    if (!nodeIds.length && !hasPage) return;
+    any = true;
+    lines.push(`## 课程 lessonId: ${lessonId}`);
+    lines.push(`对应文件: output/knowledgegraph/${lessonId}.json`);
+    lines.push('');
+    if (nodeIds.length) {
+      lines.push('### 节点级意见');
+      nodeIds.forEach(nid => {
+        const c = f.nodes[nid];
+        lines.push(`- [节点 ${nid}]「${c.label}」(level ${c.level})`);
+        lines.push(`  意见: ${c.text}`);
+      });
+      lines.push('');
+    }
+    if (hasPage) {
+      lines.push('### 页面级意见');
+      lines.push(`- ${f.page.trim()}`);
+      lines.push('');
+    }
+  });
+  if (!any) return '';
+  lines.push('---');
+  lines.push('请据以上意见对相应 lesson 的 json 二次修改，改后用 validate.py 校验、render.py 重新渲染。');
+  return lines.join('\n');
+}
+
+function copyFeedback() {
+  const text = buildFeedbackText();
+  if (!text) { showToast('尚未添加任何修改意见'); return; }
+  const done = () => showToast('修改意见已复制，粘贴给大模型即可');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+  } else {
+    fallbackCopy(text, done);
+  }
+}
+
+function fallbackCopy(text, done) {
+  const ta = document.createElement('textarea');
+  ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); done(); }
+  catch (e) { showToast('复制失败，请手动选择'); }
+  document.body.removeChild(ta);
+}
+
+let toastTimer = null;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+function loadDataset(idx) {
+  current = DATASETS[idx];
+  collapsed = new Set();
+  selectedId = null;
+  detail.className = 'detail empty';
+  detail.textContent = '点击左侧任意节点查看详细内容';
+  const m = current.meta || {};
+  const rootNode = current.graph.nodes.find(n => n.level === 0) || {};
+  const dc = rootNode.displayCode;
+  metaEl.innerHTML =
+    (dc ? `<span>代码 <b>${escapeHtml(dc)}</b></span>` : '') +
+    `<span>课程 <b>${current.lessonId}</b></span>` +
+    (m.unitId ? `<span>单元 <b>${m.unitId}</b></span>` : '') +
+    (m.textbookId ? `<span>教材 <b>${m.textbookId}</b></span>` : '') +
+    `<span>节点 <b>${current.graph.nodes.length}</b></span>`;
+  // 同步当前课程的页面级意见到输入框
+  const pc = document.getElementById('pageComment');
+  if (pc) pc.value = fbFor(current.lessonId).page || '';
+  render();
+}
+
+// 初始化
+(function init() {
+  const sel = document.getElementById('lessonSelect');
+  if (DATASETS.length > 1) {
+    document.getElementById('switcher').style.display = 'flex';
+    DATASETS.forEach((d, i) => {
+      const o = document.createElement('option');
+      o.value = i;
+      const rootLabel = (d.graph.nodes.find(n => n.level === 0) || {}).label || d.lessonId;
+      o.textContent = `${d.lessonId} · ${rootLabel}`;
+      sel.appendChild(o);
+    });
+    sel.onchange = () => loadDataset(+sel.value);
+  }
+
+  // 页面级意见：实时写入当前课程
+  const pc = document.getElementById('pageComment');
+  pc.addEventListener('input', () => {
+    fbFor(current.lessonId).page = pc.value;
+    updateFbCount();
+  });
+  // 复制 / 清空
+  document.getElementById('copyBtn').onclick = copyFeedback;
+  document.getElementById('clearBtn').onclick = () => {
+    const c = countFeedback();
+    if (!c) { showToast('当前没有意见可清空'); return; }
+    if (!confirm(`确定清空全部 ${c} 条修改意见？`)) return;
+    Object.keys(feedback).forEach(k => delete feedback[k]);
+    pc.value = '';
+    updateFbCount(); render();
+    if (selectedId) select(selectedId);
+    showToast('已清空全部意见');
+  };
+
+  // 窗口尺寸变化时重新布局居中（防抖）
+  let rzTimer = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(rzTimer);
+    rzTimer = setTimeout(() => { if (current) render(); }, 150);
+  });
+
+  loadDataset(0);
+  updateFbCount();
+})();
+</script>
+</body>
+</html>

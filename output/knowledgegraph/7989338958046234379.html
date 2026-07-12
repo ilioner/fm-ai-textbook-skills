@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>知识图谱预览</title>
+<style>
+  :root {
+    --bg: #0f1420;
+    --panel: #171d2b;
+    --panel-2: #1e2637;
+    --line: #2a3548;
+    --text: #e6ebf5;
+    --muted: #8a97ad;
+    --l0: #f5a623;
+    --l1: #4a9eff;
+    --l2: #35d0a5;
+    --accent: #6c8cff;
+    --shadow: 0 6px 24px rgba(0,0,0,.35);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+  }
+  header {
+    padding: 14px 22px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    flex-shrink: 0;
+    box-shadow: var(--shadow);
+    z-index: 10;
+  }
+  header h1 { font-size: 17px; font-weight: 600; letter-spacing: .5px; }
+  header .meta { font-size: 12px; color: var(--muted); display: flex; gap: 14px; }
+  header .meta b { color: var(--text); font-weight: 500; }
+  .switcher { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .switcher select {
+    background: var(--panel-2);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 7px 12px;
+    font-size: 13px;
+    outline: none;
+    cursor: pointer;
+  }
+  .layout { flex: 1; display: flex; min-height: 0; }
+  .canvas-wrap {
+    flex: 1;
+    overflow: auto;
+    position: relative;
+    background:
+      radial-gradient(circle at 1px 1px, rgba(255,255,255,.035) 1px, transparent 0);
+    background-size: 22px 22px;
+  }
+  #canvas { position: relative; }
+  svg.edges { position: absolute; top: 0; left: 0; pointer-events: none; overflow: visible; }
+  .node {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 10px 14px;
+    border-radius: 12px;
+    background: var(--panel-2);
+    border: none;
+    cursor: pointer;
+    transition: transform .12s, box-shadow .12s;
+    max-width: 230px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.25);
+  }
+  .node:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+  .node.selected { box-shadow: 0 0 0 2px var(--accent), var(--shadow); }
+  .node .label { font-size: 14px; font-weight: 600; line-height: 1.35; }
+  .node .badges { display: flex; flex-wrap: wrap; gap: 5px; }
+  .badge {
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 20px;
+    background: rgba(255,255,255,.08);
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .badge.tag { background: rgba(245,166,35,.18); color: var(--l0); }
+  .node .label { display: flex; align-items: flex-start; gap: 7px; }
+  .node .dot {
+    flex-shrink: 0; width: 9px; height: 9px; border-radius: 50%;
+    margin-top: 4px;
+  }
+  .node[data-level="0"] .dot { background: var(--l0); }
+  .node[data-level="1"] .dot { background: var(--l1); }
+  .node[data-level="2"] .dot { background: var(--l2); }
+  .node .toggle {
+    position: absolute;
+    right: -11px; top: 50%;
+    transform: translateY(-50%);
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 13px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    z-index: 3;
+  }
+  .node .toggle:hover { color: var(--text); border-color: var(--accent); }
+  .detail {
+    width: 380px;
+    flex-shrink: 0;
+    background: var(--panel);
+    border-left: 1px solid var(--line);
+    overflow-y: auto;
+    padding: 22px;
+  }
+  .detail.empty { display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 13px; text-align: center; }
+  .detail h2 { font-size: 18px; margin-bottom: 6px; line-height: 1.4; }
+  .detail .dl { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
+  .detail .chip {
+    font-size: 11px; padding: 3px 9px; border-radius: 20px;
+    background: var(--panel-2); color: var(--muted); border: 1px solid var(--line);
+  }
+  .detail .sec-title {
+    font-size: 12px; color: var(--muted); text-transform: uppercase;
+    letter-spacing: .8px; margin: 18px 0 10px; border-bottom: 1px solid var(--line); padding-bottom: 6px;
+  }
+  .seg {
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+  }
+  .seg .txt { font-size: 13px; line-height: 1.7; color: var(--text); white-space: pre-line; }
+  .seg .hashes { margin-top: 8px; display: flex; flex-direction: column; gap: 3px; }
+  .seg .hash {
+    margin-top: 8px; font-size: 10.5px; color: var(--muted);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    word-break: break-all; display: flex; align-items: center; gap: 6px;
+  }
+  .seg .hash::before { content: "#"; color: var(--l2); font-weight: 700; }
+  .node-hash {
+    font-size: 10.5px; color: var(--muted);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    word-break: break-all; margin-bottom: 4px;
+  }
+  .empty-hint { color: var(--muted); font-size: 12.5px; font-style: italic; }
+  .proj-tag {
+    display: inline-block; font-size: 12px; color: var(--l0);
+    background: rgba(245,166,35,.12); border: 1px solid rgba(245,166,35,.3);
+    padding: 4px 10px; border-radius: 8px; margin-bottom: 10px;
+  }
+  /* 批注编辑区（节点详情面板内） */
+  .cmt-box { margin-top: 6px; }
+  .cmt-box textarea {
+    width: 100%; min-height: 62px; resize: vertical;
+    background: var(--bg); color: var(--text);
+    border: 1px solid var(--line); border-radius: 8px;
+    padding: 9px 11px; font-size: 13px; line-height: 1.6; outline: none;
+    font-family: inherit;
+  }
+  .cmt-box textarea:focus { border-color: var(--accent); }
+  .cmt-actions { display: flex; gap: 8px; margin-top: 8px; align-items: center; }
+  .btn {
+    font-size: 12.5px; padding: 6px 13px; border-radius: 8px; cursor: pointer;
+    border: 1px solid var(--line); background: var(--panel-2); color: var(--text);
+    transition: all .12s;
+  }
+  .btn:hover { border-color: var(--accent); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.ghost { background: transparent; color: var(--muted); }
+  .cmt-saved { font-size: 11.5px; color: var(--l2); }
+  /* 有意见的节点右上角标记 */
+  .node .cmt-flag {
+    position: absolute; left: -7px; top: -7px;
+    width: 18px; height: 18px; border-radius: 50%;
+    background: var(--l0); color: #1a1200; font-size: 11px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 2px 6px rgba(0,0,0,.4); z-index: 4;
+  }
+  /* 底部反馈栏 */
+  .feedback-bar {
+    position: fixed; left: 0; right: 380px; bottom: 0;
+    background: var(--panel); border-top: 1px solid var(--line);
+    padding: 10px 22px; display: flex; align-items: center; gap: 14px;
+    box-shadow: 0 -4px 20px rgba(0,0,0,.3); z-index: 20;
+  }
+  .feedback-bar .fb-page {
+    flex: 1; background: var(--bg); color: var(--text);
+    border: 1px solid var(--line); border-radius: 8px;
+    padding: 8px 12px; font-size: 13px; outline: none; font-family: inherit;
+  }
+  .feedback-bar .fb-page:focus { border-color: var(--accent); }
+  .feedback-bar .fb-count { font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .feedback-bar .fb-count b { color: var(--l0); }
+  .canvas-wrap { padding-bottom: 56px; }
+  .toast {
+    position: fixed; bottom: 70px; left: 50%; transform: translateX(-50%);
+    background: var(--l2); color: #04231a; padding: 10px 20px; border-radius: 10px;
+    font-size: 13px; font-weight: 600; opacity: 0; transition: opacity .25s;
+    pointer-events: none; z-index: 50; box-shadow: var(--shadow);
+  }
+  .toast.show { opacity: 1; }
+  .legend { display: flex; gap: 16px; font-size: 11.5px; color: var(--muted); align-items: center; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>📚 知识图谱预览</h1>
+  <div class="meta" id="meta"></div>
+  <div class="legend">
+    <span><i style="background:var(--l0)"></i>层级0 主题</span>
+    <span><i style="background:var(--l1)"></i>层级1 分类</span>
+    <span><i style="background:var(--l2)"></i>层级2 知识点</span>
+  </div>
+  <div class="switcher" id="switcher" style="display:none">
+    <label style="font-size:12px;color:var(--muted)">选择课程</label>
+    <select id="lessonSelect"></select>
+  </div>
+</header>
+<div class="layout">
+  <div class="canvas-wrap">
+    <div id="canvas">
+      <svg class="edges" id="edges"></svg>
+    </div>
+  </div>
+  <div class="detail empty" id="detail">点击左侧任意节点查看详细内容</div>
+</div>
+
+<div class="feedback-bar">
+  <input class="fb-page" id="pageComment" type="text"
+         placeholder="对本课程的整体修改意见（页面级）…如：空域知识下 6 个子节点顺序需调整" />
+  <span class="fb-count" id="fbCount">未添加意见</span>
+  <button class="btn ghost" id="clearBtn">清空</button>
+  <button class="btn primary" id="copyBtn">📋 复制修改意见</button>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+// 数据由 render.py 注入：数组，每项 { lessonId, meta:{textbookId,unitId,lessonId}, graph:{nodes,edges} }
+const DATASETS = [{"lessonId": "7989338958046234379", "meta": {"lessonId": "7989338958046234379"}, "graph": {"nodes": [{"id": "7989338958046234379", "label": "任务2 无人机安全与法规", "level": 0, "dataHash": "fm-doc-id-071c48970af3bc3c", "displayCode": "UAS_P1T2", "knowledgeCategory": "元认知", "cognitiveDimension": "理解", "tags": "课程思政"}, {"id": "7989338958046234379_n1", "label": "无人机法规", "level": 1, "dataHash": "fm-doc-id-c6878b1ce1b5b84c", "description": [{"text": "民用无人机法律法规是无人机应用的法律保障，它使无人机飞行、作业等有法可依。依据《中华人民共和国民用航空法》《中华人民共和国飞行基本规则》《中国民用航空空中交通管制工作规则》《通用航空飞行管制条例》等制定了无人机相关法规，如由国务院下设中国民用航空局的相关部门根据民用无人机的发展状况，制定的相关规定与办法；中国民用航空局委托“中国航空器拥有者及驾驶员协会（Aircraft Owners and Pilots Asso-ciation of China，AOPA-China）”制定的相关规则（如《民用无人机驾驶员管理规定》），共同构筑了生产制造、适航审定、运行管理、人员训练、人员管理、证照管理等无人机的法制基础。", "dataHash": "fm-doc-id-ec3c0f744861f984"}, {"text": "中国航空器拥有者及驾驶员协会，成立于2004年，经国务院批准，在民政部登记注册，是国内民用航空领域第一个全国性行业协会。它是中国（含香港、澳门、台湾地区）在国际航空器拥有者及驾驶员协会（The International Council of Aircraft Owner and Pilot Association，IAOPA）的唯一合法代表。", "dataHash": "fm-doc-id-569aa1ddff110fb8"}, {"text": "无人机法规用来规范民用无人机适航性设计、生产、运行以及从业人员的训练、管理等。", "dataHash": "fm-doc-id-b17c3dc1fc3151db"}, {"text": "汽车的行驶，要遵守规则，各行其道，听从指挥，否则轻者造成交通拥堵，重者引发交通事故甚至车毁人亡。可见遵守规则的重要性。无人机的飞行也一样，要遵守无人机相关法规。", "dataHash": "fm-doc-id-04feba9d6bca89fc"}, {"text": "无人机的无序飞行曾经多次造成延误航班、干扰通信、损坏财物、误伤人员等事故，造成了不可估量的损失。当前我国政府为保证无人机的飞行安全，有序作业，制定了多项相关规定、办法，对无人机的飞行进行有序管理。这些规定、办法包括为什么要进行飞行管制、依据什么进行管制、如何进行管制等方面的内容，规定了什么样的无人机在什么情况下飞行必须进行空域申请、在什么情况下必须得到相关航空管制部门批准后才能飞行等。", "dataHash": "fm-doc-id-d943b5364a35bd58"}, {"text": "民用无人机法规具有独立性、综合性、平时性、国际性等特性。", "dataHash": "fm-doc-id-4e7fc5a522a12686"}], "knowledgeCategory": "概念性", "cognitiveDimension": "理解", "tags": "重点;课程思政"}, {"id": "7989338958046234379_n2", "label": "独立性", "level": 2, "dataHash": "fm-doc-id-46a6ccedd501f9ec", "description": [{"text": "无人机法规的独立性是指无人机的法规自成一类，形成一个独立的法律体系。", "dataHash": "fm-doc-id-1990eafe9e83bb58"}, {"text": "无人机相关法规仅适用于民用无人机的生产、适航、运行及人员管理等，不适用于有人航空器及国家航空器。当然，独立性是在继承基础上的独立，是在联系基础上的独立。没有联系与继承的独立是不存在的。", "dataHash": "fm-doc-id-8d30500c1225a98a"}, {"text": "民用无人机的相关法律、规章来源于民用航空法及其相关的规章制度，具有一定的继承性和从属性。例如，《低空空域管理使用规定》参考《中华人民共和国民用航空法》《中华人民共和国飞行基本规则》《通用航空飞行管制条例》以及军方的相关管理规定制定。同时，民用无人机的空域管理又有其独有属性，其管理的空域是指飞行高度在1000 m以下的区域，并且根据情况不同按照管制空域、报告空域、监视空域、目视飞行航线等进行了分类，所以无人机法律法规具有独立性。", "dataHash": "fm-doc-id-eaca0714b3d77a03"}], "knowledgeCategory": "概念性", "cognitiveDimension": "理解"}, {"id": "7989338958046234379_n3", "label": "综合性", "level": 2, "dataHash": "fm-doc-id-f12ba49710b90972", "description": [{"text": "综合性是指将不同部分、不同事物的属性合并成为一个整体的特性。", "dataHash": "fm-doc-id-0d6031204fc348b2"}, {"text": "无人机法规是调整无人机生产、运营及其相关领域中产生的社会关系的各种法律手段。这些手段纵横交错，法律调整方法多种多样。", "dataHash": "fm-doc-id-d28e2a227cdc905b"}, {"text": "无人机法规的综合性主要体现在涉及的法律既有民用航空的相关法律法规，又有宪法、气象法、国家安全法、民法、刑法、治安条例等方面的内容，还涉及社会关系的方方面面上，因此无人机法律法规具有将相关法规进行融合的综合性。", "dataHash": "fm-doc-id-5271812e23329ea0"}], "knowledgeCategory": "概念性", "cognitiveDimension": "理解"}, {"id": "7989338958046234379_n4", "label": "平时性", "level": 2, "dataHash": "fm-doc-id-5133c829276137d0", "description": [{"text": "平时性是指无人机相关法规仅用于调整和平时期民用无人机航空活动及其相关领域产生的社会关系。如果遇战争或国家处于紧急状态，民用无人航空则要受到战时法令或紧急状态下的非常法的约束。", "dataHash": "fm-doc-id-b571d6870f9c71d5"}], "knowledgeCategory": "概念性", "cognitiveDimension": "理解"}, {"id": "7989338958046234379_n5", "label": "国际性", "level": 2, "dataHash": "fm-doc-id-94a059fed2e3193c", "description": [{"text": "国际性体现在法律法规来源的国际性上。由于民用无人机在全球范围内发展迅速，国际民航组织已经开始为无人机系统制定标准和建议措施、空中航行服务程序及指导材料，并且多个国家发布了管理规定。我国无人机法律法规的制定既参照了其他国家或国际组织的相关条文，如美国联邦航空管理局（Federal Aviation Administration，FAA）颁布的107部规章等，也结合了相关的判例等。因此，无人机法律法规具有一定的国际性。", "dataHash": "fm-doc-id-9a03fffaaca8dc92"}], "knowledgeCategory": "概念性", "cognitiveDimension": "理解"}, {"id": "7989338958046234379_n6", "label": "空域知识", "level": 1, "dataHash": "fm-doc-id-a4a9062452617db6", "description": [{"text": "无人机的空域管理主要从无人机空域划设的原则、划设的依据、划设的内容，空中交通管制的依据、内容和相应条款等方面，把无人机飞行空域的使用与管理纳入法治化、正规化、统一化的管理之中，即由航空管制部门进行统一的管理。只有这样才能保证空中交通安全，保证各种航空器有序、安全运行。", "dataHash": "fm-doc-id-59d9beb094a416ea"}, {"text": "无人机的空域是指无人机飞行的空间。目前无人机的飞行高度为0～1000m。水平空间根据需要划分为管制空域、报告空域、监视空域、目视飞行航线、融合空域和隔离空域六类。", "dataHash": "fm-doc-id-cd140adf024cf5d3"}], "knowledgeCategory": "概念性", "cognitiveDimension": "理解", "tags": "重点"}, {"id": "7989338958046234379_n7", "label": "管制空域", "level": 2, "dataHash": "fm-doc-id-9b123dca12317717", "description": [{"text": "管制空域是指重点目标外围5km区域、以民航机场跑道中心点为中心的跑道两头各25km区域和跑道两侧各10km的区域。在该区域内，无人机需获得批准并持有执照方可飞行。", "dataHash": "fm-doc-id-f17943b2312ee1fe"}], "knowledgeCategory": "事实性", "cognitiveDimension": "记忆"}, {"id": "7989338958046234379_n8", "label": "报告空域", "level": 2, "dataHash": "fm-doc-id-370fe409e7379b57", "description": [{"text": "报告空域是指通用机场和临时起降点10km区域，且不得划设在空中禁区边缘外20km范围内和全国重点目标外缘10km范围内。在该区域内，无人机飞行必须报备飞行计划，驾驶员须持照飞行。", "dataHash": "fm-doc-id-5c4b45d790ed1140"}], "knowledgeCategory": "事实性", "cognitiveDimension": "记忆"}, {"id": "7989338958046234379_n9", "label": "监视空域", "level": 2, "dataHash": "fm-doc-id-6291fe0d02856439", "description": [{"text": "监视空域是指位于管制空域和报告空域之外的空域。", "dataHash": "fm-doc-id-b0fe2233ddaba87f"}], "knowledgeCategory": "事实性", "cognitiveDimension": "理解"}, {"id": "7989338958046234379_n10", "label": "目视飞行航线", "level": 2, "dataHash": "fm-doc-id-63d510e416ca8fb2", "description": [{"text": "目视飞行航线是指航空器处于驾驶员目视视距半径500m，相对高度低于120m的范围。", "dataHash": "fm-doc-id-cef2e2becb53045a"}], "knowledgeCategory": "事实性", "cognitiveDimension": "记忆"}, {"id": "7989338958046234379_n11", "label": "融合空域", "level": 2, "dataHash": "fm-doc-id-bbc544b4306529a7", "description": [{"text": "融合空域是指有其他航空器同时运行的空域。", "dataHash": "fm-doc-id-b7d78e89aadb764a"}], "knowledgeCategory": "事实性", "cognitiveDimension": "理解"}, {"id": "7989338958046234379_n12", "label": "隔离空域", "level": 2, "dataHash": "fm-doc-id-5ebd820d0a01d818", "description": [{"text": "隔离空域是指专门分配给无人机运行的空域，通过限制其他航空器的进入以规避碰撞风险。", "dataHash": "fm-doc-id-e8faf3915373213f"}], "knowledgeCategory": "概念性", "cognitiveDimension": "理解"}, {"id": "7989338958046234379_n13", "label": "空中交通管制", "level": 1, "dataHash": "fm-doc-id-9816d4a6a7bda514", "description": [{"text": "空中交通管制是指航空管制部门利用技术手段对无人机的飞行计划、飞行区域、飞行高度等运行情况进行管理和控制。", "dataHash": "fm-doc-id-5f046fe72cca3308"}], "knowledgeCategory": "概念性", "cognitiveDimension": "理解", "tags": "重点"}, {"id": "7989338958046234379_n14", "label": "空中交通管制的目的", "level": 2, "dataHash": "fm-doc-id-68c53cb04144d757", "description": [{"text": "空中交通管制的目的在于防止无人机与空中飞机、地面障碍物相撞，并有效地利用空域，安全地加速空中交通运输。其内容包括空中交通管制业务、飞行情报和告警业务。", "dataHash": "fm-doc-id-6f767bff5468bb0b"}], "knowledgeCategory": "概念性", "cognitiveDimension": "理解"}, {"id": "7989338958046234379_n15", "label": "空中交通管制的任务", "level": 2, "dataHash": "fm-doc-id-2c8ecd239a86344f", "description": [{"text": "空中交通管制的任务是维护空中秩序，确保飞行安全，防止航空器相撞，防止机场及其附近空域内的航空器与障碍物相撞，从而保障空中交通畅通，保证飞行安全，提高飞行效率。", "dataHash": "fm-doc-id-007c40ca03760042"}], "knowledgeCategory": "概念性", "cognitiveDimension": "理解"}, {"id": "7989338958046234379_n16", "label": "空中交通管制服务主体", "level": 2, "dataHash": "fm-doc-id-feb08ac4fb9de527", "description": [{"text": "空中交通管制服务主体是指具备空中交通管制服务资格并提供空中交通管制服务的单位和人员。", "dataHash": "fm-doc-id-3b01e45d83769add"}], "knowledgeCategory": "事实性", "cognitiveDimension": "理解"}, {"id": "7989338958046234379_n17", "label": "空中交通管制服务单位", "level": 2, "dataHash": "fm-doc-id-2e58a030c3ea283c", "description": [{"text": "空中交通管制服务单位包括机场塔台及空中交通管制室、空中交通服务报告室、进近管制室、区域管制室、民航地区管理局调度室、中国民用航空局空中交通管理局总调度室。", "dataHash": "fm-doc-id-14501920db233b6a"}], "knowledgeCategory": "事实性", "cognitiveDimension": "记忆"}, {"id": "7989338958046234379_n18", "label": "空中交通管制服务人员", "level": 2, "dataHash": "fm-doc-id-48655c1bf94479fb", "description": [{"text": "空中交通管制服务人员包括空中交通管制员、空中航行调度员、飞行签派员、航行情报员。", "dataHash": "fm-doc-id-266ba9e0aef282dd"}, {"text": "空中交通管制通常采用程序管制与雷达管制两种方法。无论是程序管制还是雷达管制，都是为了加强对无人机运行的管控，维护空中秩序，确保飞行安全。无人机的空中交通管制必须注重无人机飞行的动态控制。", "dataHash": "fm-doc-id-1a38c4fa5a53412b"}, {"text": "无人机飞行单位、个人应当与空管部门建立有效的沟通协调机制和顺畅的协同通报，对无人机及其飞行活动实施联合管理，促进我国空管改革的深入推进和无人机应用的健康发展。", "dataHash": "fm-doc-id-746f742ac5e3f307"}, {"text": "无人机空中交通运行管制的内容主要包括运行动态掌握、无人机安全间隔服务、无人机运行应急处理、无人机违规运行查处、无人机空中管制保障与协调等。", "dataHash": "fm-doc-id-47677b0ccd605b0d"}], "knowledgeCategory": "事实性", "cognitiveDimension": "记忆"}], "edges": [{"source": "7989338958046234379", "target": "7989338958046234379_n1", "type": "父子", "description": "任务2 无人机安全与法规包含无人机法规"}, {"source": "7989338958046234379_n1", "target": "7989338958046234379_n2", "type": "父子", "description": "无人机法规包含独立性"}, {"source": "7989338958046234379_n1", "target": "7989338958046234379_n3", "type": "父子", "description": "无人机法规包含综合性"}, {"source": "7989338958046234379_n1", "target": "7989338958046234379_n4", "type": "父子", "description": "无人机法规包含平时性"}, {"source": "7989338958046234379_n1", "target": "7989338958046234379_n5", "type": "父子", "description": "无人机法规包含国际性"}, {"source": "7989338958046234379", "target": "7989338958046234379_n6", "type": "父子", "description": "任务2 无人机安全与法规包含空域知识"}, {"source": "7989338958046234379_n6", "target": "7989338958046234379_n7", "type": "父子", "description": "空域知识包含管制空域"}, {"source": "7989338958046234379_n6", "target": "7989338958046234379_n8", "type": "父子", "description": "空域知识包含报告空域"}, {"source": "7989338958046234379_n6", "target": "7989338958046234379_n9", "type": "父子", "description": "空域知识包含监视空域"}, {"source": "7989338958046234379_n6", "target": "7989338958046234379_n10", "type": "父子", "description": "空域知识包含目视飞行航线"}, {"source": "7989338958046234379_n6", "target": "7989338958046234379_n11", "type": "父子", "description": "空域知识包含融合空域"}, {"source": "7989338958046234379_n6", "target": "7989338958046234379_n12", "type": "父子", "description": "空域知识包含隔离空域"}, {"source": "7989338958046234379", "target": "7989338958046234379_n13", "type": "父子", "description": "任务2 无人机安全与法规包含空中交通管制"}, {"source": "7989338958046234379_n13", "target": "7989338958046234379_n14", "type": "父子", "description": "空中交通管制包含空中交通管制的目的"}, {"source": "7989338958046234379_n13", "target": "7989338958046234379_n15", "type": "父子", "description": "空中交通管制包含空中交通管制的任务"}, {"source": "7989338958046234379_n13", "target": "7989338958046234379_n16", "type": "父子", "description": "空中交通管制包含空中交通管制服务主体"}, {"source": "7989338958046234379_n13", "target": "7989338958046234379_n17", "type": "父子", "description": "空中交通管制包含空中交通管制服务单位"}, {"source": "7989338958046234379_n13", "target": "7989338958046234379_n18", "type": "父子", "description": "空中交通管制包含空中交通管制服务人员"}]}}];
+
+const COL_W = 300;      // 层级横向间距
+const NODE_H = 62;      // 单节点占位高度
+const V_GAP = 16;       // 兄弟节点垂直间距
+const canvas = document.getElementById('canvas');
+const edgesSvg = document.getElementById('edges');
+const detail = document.getElementById('detail');
+const metaEl = document.getElementById('meta');
+
+let current = null;      // 当前数据集
+let nodeMap = {};        // id -> node
+let childrenMap = {};    // id -> [childId]
+let elMap = {};          // id -> DOM 元素（用于读取真实坐标画线）
+let collapsed = new Set();
+let selectedId = null;
+
+// 批注存储：按 lessonId 分组。{ [lessonId]: { nodes: {nodeId:{label,level,text}}, page: "" } }
+// 存在内存中（纯静态页，无需后端）。切换 lesson 不丢，复制时汇总所有有意见的 lesson。
+const feedback = {};
+function fbFor(lessonId) {
+  if (!feedback[lessonId]) feedback[lessonId] = { nodes: {}, page: "" };
+  return feedback[lessonId];
+}
+
+function buildTree(graph) {
+  nodeMap = {};
+  childrenMap = {};
+  graph.nodes.forEach(n => { nodeMap[n.id] = n; childrenMap[n.id] = []; });
+  graph.edges.forEach(e => {
+    if (childrenMap[e.source]) childrenMap[e.source].push(e.target);
+  });
+  // 根 = level 0，或无入边的节点
+  const hasParent = new Set(graph.edges.map(e => e.target));
+  return graph.nodes.filter(n => n.level === 0 || !hasParent.has(n.id)).map(n => n.id);
+}
+
+// 递归布局：用节点真实高度 node._h 计算占位，返回子树总高度，写入 node._x/_y。
+// node._y 为该节点顶端 y 坐标；节点垂直居中对齐其子树跨度。
+function layout(id, depth, cursorY) {
+  const node = nodeMap[id];
+  node._x = depth * COL_W;
+  const selfH = (node._h || NODE_H) + V_GAP;
+  const kids = collapsed.has(id) ? [] : childrenMap[id];
+  if (kids.length === 0) {
+    node._y = cursorY;
+    return selfH;
+  }
+  let y = cursorY;
+  let total = 0;
+  kids.forEach(k => {
+    const h = layout(k, depth + 1, y);
+    y += h; total += h;
+  });
+  // 父节点中心对齐首末子节点中心
+  const first = nodeMap[kids[0]];
+  const last = nodeMap[kids[kids.length - 1]];
+  const kidsMid = (first._y + (first._h || NODE_H) / 2 + last._y + (last._h || NODE_H) / 2) / 2;
+  node._y = kidsMid - (node._h || NODE_H) / 2;
+  // 子树可能比父节点自身矮，取较大者
+  return Math.max(total, selfH);
+}
+
+function render() {
+  // 清空旧节点（保留 svg）
+  [...canvas.querySelectorAll('.node')].forEach(n => n.remove());
+  elMap = {};
+  const roots = buildTree(current.graph);
+
+  // —— 阶段一：建节点并入 DOM（先不定位），测量真实高度 ——
+  Object.values(nodeMap).forEach(n => {
+    const el = document.createElement('div');
+    el.className = 'node' + (n.id === selectedId ? ' selected' : '');
+    el.dataset.level = n.level;
+    el.style.visibility = 'hidden';
+
+    const badges = [];
+    if (n.tags) badges.push(`<span class="badge tag">${n.tags}</span>`);
+    if (n.knowledgeCategory) badges.push(`<span class="badge">${n.knowledgeCategory}</span>`);
+    if (n.cognitiveDimension) badges.push(`<span class="badge">${n.cognitiveDimension}</span>`);
+
+    el.innerHTML = `<div class="label"><span class="dot"></span><span>${escapeHtml(n.label)}</span></div>` +
+                   (badges.length ? `<div class="badges">${badges.join('')}</div>` : '');
+
+    const kids = childrenMap[n.id];
+    if (kids && kids.length) {
+      const t = document.createElement('div');
+      t.className = 'toggle';
+      t.textContent = collapsed.has(n.id) ? '+' : '−';
+      t.onclick = (ev) => { ev.stopPropagation(); toggle(n.id); };
+      el.appendChild(t);
+    }
+    // 有意见的节点加标记
+    if (current && fbFor(current.lessonId).nodes[n.id]) {
+      const flag = document.createElement('div');
+      flag.className = 'cmt-flag';
+      flag.textContent = '✎';
+      flag.title = '该节点有修改意见';
+      el.appendChild(flag);
+    }
+    el.onclick = () => select(n.id);
+    canvas.appendChild(el);
+    elMap[n.id] = el;
+  });
+  // 测量真实高度/宽度写入 node._h / node._w
+  Object.values(nodeMap).forEach(n => {
+    n._h = elMap[n.id].offsetHeight;
+    n._w = elMap[n.id].offsetWidth;
+  });
+
+  // —— 阶段二：按真实高度布局 ——
+  let cursorY = 0;
+  roots.forEach(r => { cursorY += layout(r, 0, cursorY); });
+
+  // —— 阶段三：算内容包围盒 ——
+  let contentW = 0, contentH = 0;
+  Object.values(nodeMap).forEach(n => {
+    if (n._x === undefined) return;
+    contentW = Math.max(contentW, n._x + (n._w || 200));
+    contentH = Math.max(contentH, n._y + (n._h || NODE_H));
+  });
+
+  // 居中偏移：内容比视口小时居中，否则留固定边距
+  const wrap = canvas.parentElement;      // .canvas-wrap 视口
+  const PAD = 48;
+  const vw = wrap.clientWidth, vh = wrap.clientHeight;
+  const offsetX = Math.max(PAD, (vw - contentW) / 2);
+  const offsetY = Math.max(PAD, (vh - contentH) / 2);
+
+  // —— 阶段四：定位并显示 ——
+  Object.values(nodeMap).forEach(n => {
+    if (n._x === undefined) return;
+    const el = elMap[n.id];
+    el.style.left = (n._x + offsetX) + 'px';
+    el.style.top = (n._y + offsetY) + 'px';
+    el.style.visibility = 'visible';
+  });
+
+  // canvas 至少填满视口，内容超出时按内容+边距撑开
+  canvas.style.width = Math.max(vw, contentW + offsetX + PAD) + 'px';
+  canvas.style.height = Math.max(vh, contentH + offsetY + PAD) + 'px';
+  // 节点已定位，用真实坐标画线（消除偏移）
+  drawEdges();
+}
+
+function drawEdges() {
+  edgesSvg.innerHTML = '';
+  edgesSvg.setAttribute('width', canvas.style.width);
+  edgesSvg.setAttribute('height', canvas.style.height);
+  current.graph.edges.forEach(e => {
+    if (collapsed.has(e.source)) return;
+    const se = elMap[e.source], te = elMap[e.target];
+    if (!se || !te) return;
+    // 读取真实布局坐标：起点=父节点右边缘中点，终点=子节点左边缘中点
+    const x1 = se.offsetLeft + se.offsetWidth;
+    const y1 = se.offsetTop + se.offsetHeight / 2;
+    const x2 = te.offsetLeft;
+    const y2 = te.offsetTop + te.offsetHeight / 2;
+    const mx = (x1 + x2) / 2;
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`);
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', '#3a4761');
+    path.setAttribute('stroke-width', '1.6');
+    edgesSvg.appendChild(path);
+  });
+}
+
+function toggle(id) {
+  if (collapsed.has(id)) collapsed.delete(id); else collapsed.add(id);
+  render();
+}
+
+function select(id) {
+  selectedId = id;
+  render();
+  const n = nodeMap[id];
+  const chips = [];
+  chips.push(`<span class="chip">层级 ${n.level}</span>`);
+  if (n.knowledgeCategory) chips.push(`<span class="chip">${n.knowledgeCategory}</span>`);
+  if (n.cognitiveDimension) chips.push(`<span class="chip">${n.cognitiveDimension}</span>`);
+  if (n.tags) chips.push(`<span class="chip" style="color:var(--l0)">${n.tags}</span>`);
+
+  let html = '';
+  if (n.projectTitle) {
+    html += `<div class="proj-tag">📁 ${escapeHtml(n.projectTitle)}</div>`;
+  }
+  html += `<h2>${escapeHtml(n.label)}</h2>`;
+  if (n.dataHash) html += `<div class="node-hash"># ${n.dataHash}</div>`;
+  if (n.projectDataHash) html += `<div class="node-hash">项目 # ${n.projectDataHash}</div>`;
+  html += `<div class="dl">${chips.join('')}</div>`;
+
+  const desc = n.description || [];
+  if (desc.length) {
+    html += `<div class="sec-title">详细说明（${desc.length} 段）</div>`;
+    desc.forEach(d => {
+      html += `<div class="seg"><div class="txt">${escapeHtml(d.text)}</div>`;
+      if (d.sourceHashes && d.sourceHashes.length) {
+        // 合并段：列出全部源 hash（零丢失可追溯）
+        html += `<div class="hashes">` +
+          d.sourceHashes.map(s => `<div class="hash">${s.dataHash}</div>`).join('') +
+          `</div>`;
+      } else if (d.dataHash) {
+        html += `<div class="hash">${d.dataHash}</div>`;
+      }
+      html += `</div>`;
+    });
+  } else {
+    html += `<div class="sec-title">详细说明</div><div class="empty-hint">该节点为分类/主题节点，无独立正文说明。</div>`;
+  }
+
+  // 节点级批注编辑区
+  const existing = fbFor(current.lessonId).nodes[id];
+  html += `<div class="sec-title">修改意见（该节点）</div>` +
+    `<div class="cmt-box">` +
+    `<textarea id="nodeCmt" placeholder="写下对「${escapeHtml(n.label)}」的修改意见，例如：该节点应为 level 1 / 应删除 / 归类错误…">${existing ? escapeHtml(existing.text) : ''}</textarea>` +
+    `<div class="cmt-actions">` +
+    `<button class="btn primary" id="saveCmtBtn">保存意见</button>` +
+    (existing ? `<button class="btn ghost" id="delCmtBtn">删除</button><span class="cmt-saved">✓ 已记录</span>` : '') +
+    `</div></div>`;
+
+  detail.className = 'detail';
+  detail.innerHTML = html;
+
+  document.getElementById('saveCmtBtn').onclick = () => {
+    const txt = document.getElementById('nodeCmt').value.trim();
+    const store = fbFor(current.lessonId).nodes;
+    if (txt) {
+      store[id] = { label: n.label, level: n.level, text: txt };
+    } else {
+      delete store[id];
+    }
+    updateFbCount(); render(); select(id);
+    showToast(txt ? '已记录该节点意见' : '已清除该节点意见');
+  };
+  const delBtn = document.getElementById('delCmtBtn');
+  if (delBtn) delBtn.onclick = () => {
+    delete fbFor(current.lessonId).nodes[id];
+    updateFbCount(); render(); select(id);
+    showToast('已删除该节点意见');
+  };
+}
+
+function escapeHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// —— 反馈：计数、生成文本、复制 ——
+function countFeedback() {
+  let n = 0;
+  Object.values(feedback).forEach(f => {
+    n += Object.keys(f.nodes).length;
+    if (f.page && f.page.trim()) n += 1;
+  });
+  return n;
+}
+
+function updateFbCount() {
+  const c = countFeedback();
+  const el = document.getElementById('fbCount');
+  el.innerHTML = c ? `已添加 <b>${c}</b> 条意见` : '未添加意见';
+}
+
+function buildFeedbackText() {
+  // 汇总所有有意见的 lesson；只带定位信息 + 意见（正文由大模型自行读 json 定位）
+  const lines = ['# 知识图谱修改意见', ''];
+  let any = false;
+  Object.keys(feedback).forEach(lessonId => {
+    const f = feedback[lessonId];
+    const nodeIds = Object.keys(f.nodes);
+    const hasPage = f.page && f.page.trim();
+    if (!nodeIds.length && !hasPage) return;
+    any = true;
+    lines.push(`## 课程 lessonId: ${lessonId}`);
+    lines.push(`对应文件: output/knowledgegraph/${lessonId}.json`);
+    lines.push('');
+    if (nodeIds.length) {
+      lines.push('### 节点级意见');
+      nodeIds.forEach(nid => {
+        const c = f.nodes[nid];
+        lines.push(`- [节点 ${nid}]「${c.label}」(level ${c.level})`);
+        lines.push(`  意见: ${c.text}`);
+      });
+      lines.push('');
+    }
+    if (hasPage) {
+      lines.push('### 页面级意见');
+      lines.push(`- ${f.page.trim()}`);
+      lines.push('');
+    }
+  });
+  if (!any) return '';
+  lines.push('---');
+  lines.push('请据以上意见对相应 lesson 的 json 二次修改，改后用 validate.py 校验、render.py 重新渲染。');
+  return lines.join('\n');
+}
+
+function copyFeedback() {
+  const text = buildFeedbackText();
+  if (!text) { showToast('尚未添加任何修改意见'); return; }
+  const done = () => showToast('修改意见已复制，粘贴给大模型即可');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+  } else {
+    fallbackCopy(text, done);
+  }
+}
+
+function fallbackCopy(text, done) {
+  const ta = document.createElement('textarea');
+  ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); done(); }
+  catch (e) { showToast('复制失败，请手动选择'); }
+  document.body.removeChild(ta);
+}
+
+let toastTimer = null;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+function loadDataset(idx) {
+  current = DATASETS[idx];
+  collapsed = new Set();
+  selectedId = null;
+  detail.className = 'detail empty';
+  detail.textContent = '点击左侧任意节点查看详细内容';
+  const m = current.meta || {};
+  const rootNode = current.graph.nodes.find(n => n.level === 0) || {};
+  const dc = rootNode.displayCode;
+  metaEl.innerHTML =
+    (dc ? `<span>代码 <b>${escapeHtml(dc)}</b></span>` : '') +
+    `<span>课程 <b>${current.lessonId}</b></span>` +
+    (m.unitId ? `<span>单元 <b>${m.unitId}</b></span>` : '') +
+    (m.textbookId ? `<span>教材 <b>${m.textbookId}</b></span>` : '') +
+    `<span>节点 <b>${current.graph.nodes.length}</b></span>`;
+  // 同步当前课程的页面级意见到输入框
+  const pc = document.getElementById('pageComment');
+  if (pc) pc.value = fbFor(current.lessonId).page || '';
+  render();
+}
+
+// 初始化
+(function init() {
+  const sel = document.getElementById('lessonSelect');
+  if (DATASETS.length > 1) {
+    document.getElementById('switcher').style.display = 'flex';
+    DATASETS.forEach((d, i) => {
+      const o = document.createElement('option');
+      o.value = i;
+      const rootLabel = (d.graph.nodes.find(n => n.level === 0) || {}).label || d.lessonId;
+      o.textContent = `${d.lessonId} · ${rootLabel}`;
+      sel.appendChild(o);
+    });
+    sel.onchange = () => loadDataset(+sel.value);
+  }
+
+  // 页面级意见：实时写入当前课程
+  const pc = document.getElementById('pageComment');
+  pc.addEventListener('input', () => {
+    fbFor(current.lessonId).page = pc.value;
+    updateFbCount();
+  });
+  // 复制 / 清空
+  document.getElementById('copyBtn').onclick = copyFeedback;
+  document.getElementById('clearBtn').onclick = () => {
+    const c = countFeedback();
+    if (!c) { showToast('当前没有意见可清空'); return; }
+    if (!confirm(`确定清空全部 ${c} 条修改意见？`)) return;
+    Object.keys(feedback).forEach(k => delete feedback[k]);
+    pc.value = '';
+    updateFbCount(); render();
+    if (selectedId) select(selectedId);
+    showToast('已清空全部意见');
+  };
+
+  // 窗口尺寸变化时重新布局居中（防抖）
+  let rzTimer = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(rzTimer);
+    rzTimer = setTimeout(() => { if (current) render(); }, 150);
+  });
+
+  loadDataset(0);
+  updateFbCount();
+})();
+</script>
+</body>
+</html>

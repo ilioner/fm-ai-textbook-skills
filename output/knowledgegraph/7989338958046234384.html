@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>知识图谱预览</title>
+<style>
+  :root {
+    --bg: #0f1420;
+    --panel: #171d2b;
+    --panel-2: #1e2637;
+    --line: #2a3548;
+    --text: #e6ebf5;
+    --muted: #8a97ad;
+    --l0: #f5a623;
+    --l1: #4a9eff;
+    --l2: #35d0a5;
+    --accent: #6c8cff;
+    --shadow: 0 6px 24px rgba(0,0,0,.35);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+  }
+  header {
+    padding: 14px 22px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    flex-shrink: 0;
+    box-shadow: var(--shadow);
+    z-index: 10;
+  }
+  header h1 { font-size: 17px; font-weight: 600; letter-spacing: .5px; }
+  header .meta { font-size: 12px; color: var(--muted); display: flex; gap: 14px; }
+  header .meta b { color: var(--text); font-weight: 500; }
+  .switcher { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .switcher select {
+    background: var(--panel-2);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 7px 12px;
+    font-size: 13px;
+    outline: none;
+    cursor: pointer;
+  }
+  .layout { flex: 1; display: flex; min-height: 0; }
+  .canvas-wrap {
+    flex: 1;
+    overflow: auto;
+    position: relative;
+    background:
+      radial-gradient(circle at 1px 1px, rgba(255,255,255,.035) 1px, transparent 0);
+    background-size: 22px 22px;
+  }
+  #canvas { position: relative; }
+  svg.edges { position: absolute; top: 0; left: 0; pointer-events: none; overflow: visible; }
+  .node {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 10px 14px;
+    border-radius: 12px;
+    background: var(--panel-2);
+    border: none;
+    cursor: pointer;
+    transition: transform .12s, box-shadow .12s;
+    max-width: 230px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.25);
+  }
+  .node:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+  .node.selected { box-shadow: 0 0 0 2px var(--accent), var(--shadow); }
+  .node .label { font-size: 14px; font-weight: 600; line-height: 1.35; }
+  .node .badges { display: flex; flex-wrap: wrap; gap: 5px; }
+  .badge {
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 20px;
+    background: rgba(255,255,255,.08);
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .badge.tag { background: rgba(245,166,35,.18); color: var(--l0); }
+  .node .label { display: flex; align-items: flex-start; gap: 7px; }
+  .node .dot {
+    flex-shrink: 0; width: 9px; height: 9px; border-radius: 50%;
+    margin-top: 4px;
+  }
+  .node[data-level="0"] .dot { background: var(--l0); }
+  .node[data-level="1"] .dot { background: var(--l1); }
+  .node[data-level="2"] .dot { background: var(--l2); }
+  .node .toggle {
+    position: absolute;
+    right: -11px; top: 50%;
+    transform: translateY(-50%);
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 13px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    z-index: 3;
+  }
+  .node .toggle:hover { color: var(--text); border-color: var(--accent); }
+  .detail {
+    width: 380px;
+    flex-shrink: 0;
+    background: var(--panel);
+    border-left: 1px solid var(--line);
+    overflow-y: auto;
+    padding: 22px;
+  }
+  .detail.empty { display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 13px; text-align: center; }
+  .detail h2 { font-size: 18px; margin-bottom: 6px; line-height: 1.4; }
+  .detail .dl { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
+  .detail .chip {
+    font-size: 11px; padding: 3px 9px; border-radius: 20px;
+    background: var(--panel-2); color: var(--muted); border: 1px solid var(--line);
+  }
+  .detail .sec-title {
+    font-size: 12px; color: var(--muted); text-transform: uppercase;
+    letter-spacing: .8px; margin: 18px 0 10px; border-bottom: 1px solid var(--line); padding-bottom: 6px;
+  }
+  .seg {
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+  }
+  .seg .txt { font-size: 13px; line-height: 1.7; color: var(--text); white-space: pre-line; }
+  .seg .hashes { margin-top: 8px; display: flex; flex-direction: column; gap: 3px; }
+  .seg .hash {
+    margin-top: 8px; font-size: 10.5px; color: var(--muted);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    word-break: break-all; display: flex; align-items: center; gap: 6px;
+  }
+  .seg .hash::before { content: "#"; color: var(--l2); font-weight: 700; }
+  .node-hash {
+    font-size: 10.5px; color: var(--muted);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    word-break: break-all; margin-bottom: 4px;
+  }
+  .empty-hint { color: var(--muted); font-size: 12.5px; font-style: italic; }
+  .proj-tag {
+    display: inline-block; font-size: 12px; color: var(--l0);
+    background: rgba(245,166,35,.12); border: 1px solid rgba(245,166,35,.3);
+    padding: 4px 10px; border-radius: 8px; margin-bottom: 10px;
+  }
+  /* 批注编辑区（节点详情面板内） */
+  .cmt-box { margin-top: 6px; }
+  .cmt-box textarea {
+    width: 100%; min-height: 62px; resize: vertical;
+    background: var(--bg); color: var(--text);
+    border: 1px solid var(--line); border-radius: 8px;
+    padding: 9px 11px; font-size: 13px; line-height: 1.6; outline: none;
+    font-family: inherit;
+  }
+  .cmt-box textarea:focus { border-color: var(--accent); }
+  .cmt-actions { display: flex; gap: 8px; margin-top: 8px; align-items: center; }
+  .btn {
+    font-size: 12.5px; padding: 6px 13px; border-radius: 8px; cursor: pointer;
+    border: 1px solid var(--line); background: var(--panel-2); color: var(--text);
+    transition: all .12s;
+  }
+  .btn:hover { border-color: var(--accent); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.ghost { background: transparent; color: var(--muted); }
+  .cmt-saved { font-size: 11.5px; color: var(--l2); }
+  /* 有意见的节点右上角标记 */
+  .node .cmt-flag {
+    position: absolute; left: -7px; top: -7px;
+    width: 18px; height: 18px; border-radius: 50%;
+    background: var(--l0); color: #1a1200; font-size: 11px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 2px 6px rgba(0,0,0,.4); z-index: 4;
+  }
+  /* 底部反馈栏 */
+  .feedback-bar {
+    position: fixed; left: 0; right: 380px; bottom: 0;
+    background: var(--panel); border-top: 1px solid var(--line);
+    padding: 10px 22px; display: flex; align-items: center; gap: 14px;
+    box-shadow: 0 -4px 20px rgba(0,0,0,.3); z-index: 20;
+  }
+  .feedback-bar .fb-page {
+    flex: 1; background: var(--bg); color: var(--text);
+    border: 1px solid var(--line); border-radius: 8px;
+    padding: 8px 12px; font-size: 13px; outline: none; font-family: inherit;
+  }
+  .feedback-bar .fb-page:focus { border-color: var(--accent); }
+  .feedback-bar .fb-count { font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .feedback-bar .fb-count b { color: var(--l0); }
+  .canvas-wrap { padding-bottom: 56px; }
+  .toast {
+    position: fixed; bottom: 70px; left: 50%; transform: translateX(-50%);
+    background: var(--l2); color: #04231a; padding: 10px 20px; border-radius: 10px;
+    font-size: 13px; font-weight: 600; opacity: 0; transition: opacity .25s;
+    pointer-events: none; z-index: 50; box-shadow: var(--shadow);
+  }
+  .toast.show { opacity: 1; }
+  .legend { display: flex; gap: 16px; font-size: 11.5px; color: var(--muted); align-items: center; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>📚 知识图谱预览</h1>
+  <div class="meta" id="meta"></div>
+  <div class="legend">
+    <span><i style="background:var(--l0)"></i>层级0 主题</span>
+    <span><i style="background:var(--l1)"></i>层级1 分类</span>
+    <span><i style="background:var(--l2)"></i>层级2 知识点</span>
+  </div>
+  <div class="switcher" id="switcher" style="display:none">
+    <label style="font-size:12px;color:var(--muted)">选择课程</label>
+    <select id="lessonSelect"></select>
+  </div>
+</header>
+<div class="layout">
+  <div class="canvas-wrap">
+    <div id="canvas">
+      <svg class="edges" id="edges"></svg>
+    </div>
+  </div>
+  <div class="detail empty" id="detail">点击左侧任意节点查看详细内容</div>
+</div>
+
+<div class="feedback-bar">
+  <input class="fb-page" id="pageComment" type="text"
+         placeholder="对本课程的整体修改意见（页面级）…如：空域知识下 6 个子节点顺序需调整" />
+  <span class="fb-count" id="fbCount">未添加意见</span>
+  <button class="btn ghost" id="clearBtn">清空</button>
+  <button class="btn primary" id="copyBtn">📋 复制修改意见</button>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+// 数据由 render.py 注入：数组，每项 { lessonId, meta:{textbookId,unitId,lessonId}, graph:{nodes,edges} }
+const DATASETS = [{"lessonId": "7989338958046234384", "meta": {"lessonId": "7989338958046234384"}, "graph": {"nodes": [{"id": "7989338958046234384", "label": "任务1 学习无人机航拍技巧", "level": 0, "dataHash": "fm-doc-id-5a7037d10d406e75", "displayCode": "UAS_P3T1", "projectTitle": "项目三 无人机影视航拍", "projectDataHash": "fm-doc-id-08eaed38e32d9f54", "description": [{"text": "无人机拍摄镜头的运动方式分为静态镜头和动态镜头，两种运动方式都力求最大限度地保持画面的稳定与平衡。所谓静态镜头，就是无人机固定在一个位置进行拍摄，通常无人机上的摄像设备使用云台来固定。动态镜头是指因无人机的运动或镜头焦距的改变而引起的影像具有动感的镜头。无人机拍摄的动态镜头大致有“推、拉、摇、移、跟”五种基本运动方式。", "dataHash": "fm-doc-id-1e9d7407e99f837b"}], "knowledgeCategory": "元认知", "cognitiveDimension": "理解"}, {"id": "7989338958046234384_n1", "label": "静态镜头", "level": 1, "dataHash": "fm-doc-id-d9b0f897d84e6d5a", "description": [{"text": "拍摄静态镜头是利用以往摄像经验去拍摄一些静态镜头。我们不能因为自己可以灵活地运动镜头而去随意地动。这时我们可以用悬停的镜头捕捉到一些精美的画面和动作。", "dataHash": "fm-doc-id-6fa9af5e70f2dfd7"}, {"text": "在拍摄静态镜头时，我们可以分为无人机悬停拍摄的图片镜头和无人机不动画面内容在动的视频镜头。", "dataHash": "fm-doc-id-228aa80e8c21ab6f"}, {"text": "在拍摄静态（图片）镜头时，我们不需要考虑图片的大小，它远比拍摄视频时要小得多。拍摄模式，可以采用单次或者连续拍摄模式。连续拍摄模式可以很快地连续进行手动拍摄，可以在一秒内拍摄出10多张静态图。静态（图片）镜头是一种广角图片，它的构图优点为：一是画面内容丰富；二是视觉冲击力很强，极具观赏性。无人机拍摄模式中，有四种全景模式（图3.1.1），如球形、180°、广角、竖拍等。", "dataHash": "fm-doc-id-c76ad7bf4f4ce993"}, {"text": "在拍摄静态（视频）镜头时，要做好准备工作，选好拍摄点，让拍摄物有一个入画、行进、出画的过程，或者拍摄物正好处在变化当中，让镜头能展示被拍摄物的全貌或者被拍摄物变化（运动）的全貌。", "dataHash": "fm-doc-id-0f7fa2a624220ed7"}, {"text": "当然，在拍摄静态（视频）镜头时，要注意提前规划好构图，一般来说可以用三分线构图。顾名思义，三分线构图就是将画面布局三等分，其中纵向三分线构图是将主体或辅体放在画面中的左侧位置，从而突出主体。如果单条的垂直线置于画面的中央，则为竖中央线构图，可以让构图更加美观，视觉冲击力更强。", "dataHash": "fm-doc-id-504d2946f57e5692"}, {"text": "水平线构图是以一条水平线来进行构图，给人辽阔、平静的感觉。这种构图需要前期寻找好的拍摄地点进行拍摄，对摄像师的画面感有比较高的要求，这种构图适合航拍风光大片。", "dataHash": "fm-doc-id-995764e0893720d1"}], "knowledgeCategory": "程序性", "cognitiveDimension": "应用", "tags": "重点"}, {"id": "7989338958046234384_n2", "label": "动态镜头（初级）", "level": 1, "dataHash": "fm-doc-id-e956630ab09b1074", "description": [{"text": "动态镜头是使用无人机航拍时最常使用的镜头。拍摄时，无人机处于运动状态。动态镜头的运动方式有很多种。以下将从摄像的几种常用方式讲起，再介绍航拍特有的镜头的运动方式。动态镜头使用的关键是缓慢流畅地移动镜头。", "dataHash": "fm-doc-id-ec88597baeb1344a"}], "knowledgeCategory": "程序性", "cognitiveDimension": "应用", "tags": "重点"}, {"id": "7989338958046234384_n3", "label": "推摄", "level": 2, "dataHash": "fm-doc-id-a5cce8efde55ebea", "description": [{"text": "推摄是无人机向被拍摄对象的方向推进，或变动镜头焦距，使画面框架由远而近向被拍摄对象不断接近的拍摄方法。推镜头会使画框所包含的空间范围缩小，在画面框架中由大景别切换到小景别，被拍摄对象的主要部分在画幅中所占比例逐步升高，而次要部分逐渐减少。在实践中，我们发现多数无人机机载相机的镜头为定焦镜头，镜头本身无法实现推拉。推拉定焦头靠无人机的前进和后退来实现。但这种靠位移实现的推拉，与镜头的推拉不一样。当推镜头即镜头焦距越来越长时，背景会被压缩。所谓压缩，就是背景与前面的物体看起来越来越近；反之，镜头变广，会让背景与物体看起来越来越远。有些酒店拍摄宣传照正是使用的广角镜头，才使得房间显得比实际大很多。通过数码变焦的方法来实现推镜头。通过镜头推拉实现的光学变焦是真的变焦；而数码变焦是通过将传感器上的每个像素面积增大，实现变焦效果。使用数码变焦，“拉近”画面，会降低画质、增加噪点。", "dataHash": "fm-doc-id-b6535169cd615644"}], "knowledgeCategory": "程序性", "cognitiveDimension": "应用"}, {"id": "7989338958046234384_n4", "label": "拉摄", "level": 2, "dataHash": "fm-doc-id-175742fd748f52fd", "description": [{"text": "拉摄即无人机上的摄像设备逐渐远离被拍摄对象，或变动镜头焦距（从长焦调至广角），使画面框架由近至远与主体拉开距离的拍摄方法，与推镜头的运动方向相反。先强调主体的重要内容，再通过拉开距离，展现主体全貌，甚至表现主体与背景的关系。拉镜头是摄像机逐渐远离被拍摄对象，使画面框架由近至远与主体拉开距离的拍摄方法。它的作用是先强调主体，再通过镜头的后拉，从而建立主体和环境的关系。这也是一种由人到景，把注意力从人物身上转向环境的基本手段。同样，航拍拉镜头也通常表现为无人机由近及远飞离被摄主体，使用拉镜头拍摄时应当注意以下问题。", "dataHash": "fm-doc-id-f536c79bb3a37bc6"}, {"text": "（1）镜头的运动方向与推镜头正相反，推镜头要以落幅为重点，拉镜头应以起幅为核心。无论是推镜头落幅，还是拉镜头起幅，最好都采用中景或近景。", "dataHash": "fm-doc-id-599d1059b7df50e5"}, {"text": "（2）拉镜头的落幅范围是无限扩大的，可以把一个镜头从人物特写一直拉到几百米高空，因此需要考虑到更大场景的镜头美感，从而给观众带来感官上的巨大冲击。", "dataHash": "fm-doc-id-93c5b9fe3292b48b"}], "knowledgeCategory": "程序性", "cognitiveDimension": "应用"}, {"id": "7989338958046234384_n5", "label": "摇摄", "level": 2, "dataHash": "fm-doc-id-2c35aaa1f5ff74b2", "description": [{"text": "摇摄就是无人机机身不动，镜头水平旋转或者垂直旋转（图3.1.2）。如果广角镜头无法把整个画面完全拍摄下来，那么就应该使用摇摄的拍摄方式。", "dataHash": "fm-doc-id-c301c998afdb64c2"}, {"text": "（1）水平摇摄：左右摇动镜头，可以很好地拍摄宽广的全景，或者是左右移动的目标，一般适用于表现浩大的群众场面或壮阔的自然美景。例如，电影中拍摄警车追逐嫌犯的车辆，为体现速度与激情，需要水平摇动镜头。拍摄这样的动态车辆，首先要规划好车辆行驶的路线以及摇摄的起始点。无人机则可通过拨动控制杆实现摇镜头。我们可以缓慢摇动镜头扫过，以展示和介绍更多场景。", "dataHash": "fm-doc-id-a0b79c1ee6e8b121"}, {"text": "（2）垂直摇摄：俯仰镜头，主要展现的是高大建筑的雄伟和悬崖峭壁的险峻。例如，可以追踪跳水运动员。以运动员预备动作为起幅，运动员从起跳到入水，镜头随运动员下落的动作，逐步下移。纵向的建筑物是垂直摇摄的最好目标。站在一座高楼前，先用平摄的方法拍摄景物的底座，再从下往上慢慢移动镜头直至高楼的顶端，显得建筑雄伟壮观。大多数无人机的遥控器都有俯仰拨轮，可以实现远程操控摇动。使用操控云台实摄一座高楼时，我们自然会使用俯仰镜头。其实，当我们用摇镜头时，划过画面就是在拍摄全景。俯仰镜头也是摇镜头的一种，只不过是上下摇动。从视觉心理学角度看，因为物体坠落是垂直运动，这种上下摇动的俯仰镜头给人以一种不安、刺激或危险的感觉，这一点儿不像横向的摇镜头，给人以平静的感觉。", "dataHash": "fm-doc-id-c6334d7583503b42"}], "knowledgeCategory": "程序性", "cognitiveDimension": "应用"}, {"id": "7989338958046234384_n6", "label": "移摄", "level": 2, "dataHash": "fm-doc-id-104888767e0b02dc", "description": [{"text": "移摄是将摄像机架在活动物体上，沿水平面作各个方向的移动拍摄（图3.1.3）。简单来说，就是在录像的同时，将无人机前后平移或左右平移进行拍摄。平移航拍镜头类似于画轴式的场面、场景展示，这种无人机航拍镜头主要用来表现大面积、长距离的拍摄主体。沿着轨道移动，我们可以得到流畅的镜头运动。但在无人机航拍实践中，我们没有物理轨道，只能利用控制手柄，这需要操作员熟练的航拍技巧，从而使得用移镜头拍摄出来的镜头富有临场感，但特别需要注意以下两个方面。", "dataHash": "fm-doc-id-97e4fca33570ef0c"}, {"text": "（1）尽可能保持画面的平稳，专业级的增稳云台均能达到稳定图像的要求，而操作员仅需实时修正所拍摄的目标，保持整个画面的平稳。", "dataHash": "fm-doc-id-99c7fed9a6aca1bb"}, {"text": "（2）尽可能发挥无人机拍摄灵活、多视点、多角度的优势，如穿越桥洞、门洞、飞越山峰、高楼等，均是极好的应用场景，尽量在表现大场面、大纵深、多景物、多层次的复杂场景时，营造出气势恢宏的造型效果。", "dataHash": "fm-doc-id-c22efbb4db3c1604"}, {"text": "移镜头可为影像增加视觉效果。视觉方向与飞行方向不同，这考验着我们的方向感和摇杆操作。镜头变焦和移镜头产生的效果相似，但拍出的画面真实感远不如后者。运用无人机航拍平移镜头拍摄火车、路桥、河流等景物，能非常准确地展现被拍摄对象的形象和特征。", "dataHash": "fm-doc-id-5bd0ce51061217af"}], "knowledgeCategory": "程序性", "cognitiveDimension": "应用"}, {"id": "7989338958046234384_n7", "label": "跟摄", "level": 2, "dataHash": "fm-doc-id-ecf34b84c3724b04", "description": [{"text": "跟摄是无人机始终跟随运动中的目标进行移动拍摄，以达到连贯流畅的视觉效果。在无人机航拍实践中，跟镜头的操作方式与移镜头类似，只是要求更加严格、控制更加复杂。跟拍可以拍摄主体的后面、前面、侧面，这种无人机航拍手法多用于运动、旅行、探索类节目的航拍。此类拍摄通常是由固定翼飞行器无法完成的，需要使用多轴旋翼式飞行器。需要注意的是：跟上、追准被摄对象是跟镜头拍摄的基本要求。在跟拍镜头中，距离被拍摄对象更近，无人机的飞行路线更加复杂，需要提前计算好被摄物体的大致运动方向，以便于计划飞行线路。跟镜头是通过机位运动完成的一种拍摄方式，镜头运动起来后所带来的一系列拍摄上的问题，如焦点的变化、拍摄角度的变化、光线入射角的变化，也是跟镜头拍摄时应考虑和注意的问题。因为无人机跟拍系统有自动锁定拍摄主体的功能，所以拍摄时可以异常灵活地占据操作员无法到达的点位，在高度和角度允许的情况下自由飞行，轻而易举地保持跟镜头的流畅性和连续性。", "dataHash": "fm-doc-id-1a6dfcc25cdee9b9"}], "knowledgeCategory": "程序性", "cognitiveDimension": "应用"}, {"id": "7989338958046234384_n8", "label": "动态镜头（进阶）", "level": 1, "dataHash": "fm-doc-id-567e6810e4ac2799", "description": [{"text": "此外，无人机航拍还有更为进阶的航拍技巧，如展现拍摄、环绕拍摄、穿行拍摄等。我们只要借助云台，就能使这些飞行动作获得流畅稳定的画面。", "dataHash": "fm-doc-id-cb90965d0eb6b45a"}], "knowledgeCategory": "程序性", "cognitiveDimension": "应用", "tags": "重点;难点"}, {"id": "7989338958046234384_n9", "label": "展现拍摄", "level": 2, "dataHash": "fm-doc-id-42f85f7a50f80f47", "description": [{"text": "展现拍摄具有一定的揭示性，可以作为电影开始的定场画面出现（图3.1.4）。首先揭示性镜头从一个小画面开始，然后随着镜头的移动向前逐渐展现。这是一部影片开始或展示某些大的被拍摄对象时非常不错的方法，可以揭示出意料之外的场景，如瀑布、高山。我们可以从树木或山丘这样的遮挡物开始拍起，也可以从一个物体的特写拍起，随着无人机的移动，视野逐渐开阔，揭示出物体的所在场景，就像在观众面前慢慢展现一份礼物。另一种展现拍摄，通过滑动并倾斜无人机来实现。", "dataHash": "fm-doc-id-83f4fc6810cedab3"}, {"text": "例如，我们操控无人机向前飞行，镜头首先向下拍摄，然后，继续向目标场景飞行并缓慢抬起镜头，最后使整个场景尽收眼底。我们可将展现拍摄分为两类：前向展现，操作无人机向前飞行，保持稳定，无人机慢慢向上倾斜，展现出被拍摄对象的全貌；反向展现，操作无人机向后飞行，同时向下倾斜摄像机，从而展现出被拍摄对象。此外，在用无人机拍摄时，要观察好周围环境，计划好拍摄路线，确定好从哪里开始，从哪里结束，以及镜头的倾斜角度等。拍摄时要有耐心，保持画面流畅。", "dataHash": "fm-doc-id-6db58ec86f623c29"}], "knowledgeCategory": "程序性", "cognitiveDimension": "应用"}, {"id": "7989338958046234384_n10", "label": "环绕拍摄", "level": 2, "dataHash": "fm-doc-id-1dec52e40d73b464", "description": [{"text": "环绕拍摄是指无人机围绕一个兴趣点按弧线、扇形、整圆等路径进行飞行拍摄。无人机拍摄时的环绕镜头易于凸显和强调被拍摄对象。我们操控无人机从左侧或右侧进行侧飞，同时进行相反方向的偏航控制，从而形成一个圆形的飞行轨迹，并保持无人机的镜头对准被拍摄对象形成一个圆形的飞行轨迹，同时保证无人机的镜头对准目标点。比如，环绕拍摄某一地标性建筑或者主人公时，镜头角度持续环绕移动，而画面背景也会相应地旋转更替，使得这种环绕拍摄的效果的感官刺激性强，动感十足。", "dataHash": "fm-doc-id-6e616b17f16450f1"}, {"text": "当然，我们推荐用手动操作来完成环绕拍摄，这样不仅自由度高，而且也不困难。对准拍摄景物，调整好无人机的高度、与景物的距离。环绕拍摄的步骤：操控摇杆控制速度，另一边控制旋转和方向。这需要一定的练习才能协调操作。半环绕拍摄比环绕拍摄简单很多。它的动态比较主动，有扫掠的感觉即可。以上两种方式都能以出人意料的方式展现拍摄对象，表现史诗般的大场面转换。", "dataHash": "fm-doc-id-2d57a0729f59041a"}], "knowledgeCategory": "程序性", "cognitiveDimension": "应用"}, {"id": "7989338958046234384_n11", "label": "穿行拍摄", "level": 2, "dataHash": "fm-doc-id-fcf8c0ef867aa539", "description": [{"text": "顾名思义，穿行拍摄就是无人机从场景中穿过并拍摄（图3.1.5）。这是一种有趣但稍有难度的拍摄方法。穿行拍摄时，飞行要平稳缓慢，若想加点速，建议在后期处理时提速。大多数情况下，镜头的方向是正向前或向后。因此，如果飞行过快，可能会在镜头中出现螺旋桨的影子。", "dataHash": "fm-doc-id-c13f9d3788329e15"}, {"text": "穿行拍摄是一项很有技术性的操作。熟练的操作员也一定要在拍摄前，确定能精确控制无人机悬停，保障穿行的位置的准确性。除此之外，要计划好飞行路线：从哪里飞入，哪里拍摄，哪里飞出。对于经验丰富的操作员，可以尝试穿越树林，沿着屋顶线飞行，甚至从大的孔洞中穿过。这样可以拍摄到更多精彩的镜头，为视频添彩。穿行拍摄会带给观众一种身临其境的真实感，领略无人机穿行其中的真实场景。", "dataHash": "fm-doc-id-8c4e02fa8c19ca27"}], "knowledgeCategory": "程序性", "cognitiveDimension": "应用", "tags": "难点"}, {"id": "7989338958046234384_n12", "label": "追逐拍摄", "level": 2, "dataHash": "fm-doc-id-f73b9ac941d565ff", "description": [{"text": "追逐拍摄从静止开始，追逐被拍摄对象一起移动，与其保持相对固定的较近距离。追逐拍摄一般被用于拍摄《动物世界》中猛兽捕食猎物的场景，或者是汽车广告。我们在拍摄前与被拍摄对象保持一定的距离，可以在被拍摄对象的前、后、左、右、上等方向使用航拍器追摄。如此，就有足够距离进行加速和角度切换，一直随着动作的进行而拍摄，拍摄难度也不小，但画面效果令人兴奋。若速度要更快一些，经常是在后期编辑视频时加快速度，其往往被用作近距离特写拍摄，增强画面的动感。因此在拍摄时，时间的把握显得尤为重要。追逐拍摄的难点是与被拍摄对象保持相同的运动速度，特别是无人机与被摄对象距离较近的时候，容易产生追尾或者甩尾的问题。因此，当你还没有熟练掌握无人机操控时，请勿使用这种方法。在有条件的情况下需要提前演练，但滑雪、冲浪等体育运动就难以演练。所以追逐拍摄相当考验敏捷的反应和自如的操控。紧跟被拍摄对象的同时，要随时调整拍摄角度与距离，将被拍摄对象框在画面中心。如果你还不放心的话，可以使用大画幅来拍摄，追摄时镜头稍微靠后一点。如此一来，后期制作时可以确保被拍摄对象处于画面中间，镜头运动变化也会显得轻柔自然。", "dataHash": "fm-doc-id-cd0b0c72b3dda768"}], "knowledgeCategory": "程序性", "cognitiveDimension": "应用"}, {"id": "7989338958046234384_n13", "label": "鸟瞰拍摄", "level": 2, "dataHash": "fm-doc-id-41dad039c55cec5e", "description": [{"text": "鸟瞰拍摄是无人机拍摄的经典角度，也是航拍影像创意方式中极具视觉冲击力的一种技巧，即将摄像机的镜头垂直对着地面拍摄，就像卫星地图那样（图3.1.6）。这种“上帝视角”与追逐拍摄、环绕拍摄等其他几种拍摄方式都不同，效果更加震撼，视角也更加独特。从高空垂直向下进行拍摄，这时我们的无人机摄像机的镜头就像一台扫描仪，平稳地移动镜头实现俯拍全景，以此清楚地交代环境和风景。例如，俯瞰社区的环境，从空中跟踪监控车辆等。还有一种不错的拍摄方式是，使用鸟瞰视角，渐渐飞高与被拍摄对象拉开一定的距离，揭示出被拍摄对象所在环境的宽广和规模，可谓“不畏浮云遮望眼，自缘身在最高层”，美景尽收眼底。", "dataHash": "fm-doc-id-77139d59564efc89"}], "knowledgeCategory": "程序性", "cognitiveDimension": "应用"}], "edges": [{"source": "7989338958046234384", "target": "7989338958046234384_n1", "type": "父子", "description": "任务1 学习无人机航拍技巧包含静态镜头"}, {"source": "7989338958046234384", "target": "7989338958046234384_n2", "type": "父子", "description": "任务1 学习无人机航拍技巧包含动态镜头（初级）"}, {"source": "7989338958046234384_n2", "target": "7989338958046234384_n3", "type": "父子", "description": "动态镜头（初级）包含推摄"}, {"source": "7989338958046234384_n2", "target": "7989338958046234384_n4", "type": "父子", "description": "动态镜头（初级）包含拉摄"}, {"source": "7989338958046234384_n2", "target": "7989338958046234384_n5", "type": "父子", "description": "动态镜头（初级）包含摇摄"}, {"source": "7989338958046234384_n2", "target": "7989338958046234384_n6", "type": "父子", "description": "动态镜头（初级）包含移摄"}, {"source": "7989338958046234384_n2", "target": "7989338958046234384_n7", "type": "父子", "description": "动态镜头（初级）包含跟摄"}, {"source": "7989338958046234384", "target": "7989338958046234384_n8", "type": "父子", "description": "任务1 学习无人机航拍技巧包含动态镜头（进阶）"}, {"source": "7989338958046234384_n8", "target": "7989338958046234384_n9", "type": "父子", "description": "动态镜头（进阶）包含展现拍摄"}, {"source": "7989338958046234384_n8", "target": "7989338958046234384_n10", "type": "父子", "description": "动态镜头（进阶）包含环绕拍摄"}, {"source": "7989338958046234384_n8", "target": "7989338958046234384_n11", "type": "父子", "description": "动态镜头（进阶）包含穿行拍摄"}, {"source": "7989338958046234384_n8", "target": "7989338958046234384_n12", "type": "父子", "description": "动态镜头（进阶）包含追逐拍摄"}, {"source": "7989338958046234384_n8", "target": "7989338958046234384_n13", "type": "父子", "description": "动态镜头（进阶）包含鸟瞰拍摄"}]}}];
+
+const COL_W = 300;      // 层级横向间距
+const NODE_H = 62;      // 单节点占位高度
+const V_GAP = 16;       // 兄弟节点垂直间距
+const canvas = document.getElementById('canvas');
+const edgesSvg = document.getElementById('edges');
+const detail = document.getElementById('detail');
+const metaEl = document.getElementById('meta');
+
+let current = null;      // 当前数据集
+let nodeMap = {};        // id -> node
+let childrenMap = {};    // id -> [childId]
+let elMap = {};          // id -> DOM 元素（用于读取真实坐标画线）
+let collapsed = new Set();
+let selectedId = null;
+
+// 批注存储：按 lessonId 分组。{ [lessonId]: { nodes: {nodeId:{label,level,text}}, page: "" } }
+// 存在内存中（纯静态页，无需后端）。切换 lesson 不丢，复制时汇总所有有意见的 lesson。
+const feedback = {};
+function fbFor(lessonId) {
+  if (!feedback[lessonId]) feedback[lessonId] = { nodes: {}, page: "" };
+  return feedback[lessonId];
+}
+
+function buildTree(graph) {
+  nodeMap = {};
+  childrenMap = {};
+  graph.nodes.forEach(n => { nodeMap[n.id] = n; childrenMap[n.id] = []; });
+  graph.edges.forEach(e => {
+    if (childrenMap[e.source]) childrenMap[e.source].push(e.target);
+  });
+  // 根 = level 0，或无入边的节点
+  const hasParent = new Set(graph.edges.map(e => e.target));
+  return graph.nodes.filter(n => n.level === 0 || !hasParent.has(n.id)).map(n => n.id);
+}
+
+// 递归布局：用节点真实高度 node._h 计算占位，返回子树总高度，写入 node._x/_y。
+// node._y 为该节点顶端 y 坐标；节点垂直居中对齐其子树跨度。
+function layout(id, depth, cursorY) {
+  const node = nodeMap[id];
+  node._x = depth * COL_W;
+  const selfH = (node._h || NODE_H) + V_GAP;
+  const kids = collapsed.has(id) ? [] : childrenMap[id];
+  if (kids.length === 0) {
+    node._y = cursorY;
+    return selfH;
+  }
+  let y = cursorY;
+  let total = 0;
+  kids.forEach(k => {
+    const h = layout(k, depth + 1, y);
+    y += h; total += h;
+  });
+  // 父节点中心对齐首末子节点中心
+  const first = nodeMap[kids[0]];
+  const last = nodeMap[kids[kids.length - 1]];
+  const kidsMid = (first._y + (first._h || NODE_H) / 2 + last._y + (last._h || NODE_H) / 2) / 2;
+  node._y = kidsMid - (node._h || NODE_H) / 2;
+  // 子树可能比父节点自身矮，取较大者
+  return Math.max(total, selfH);
+}
+
+function render() {
+  // 清空旧节点（保留 svg）
+  [...canvas.querySelectorAll('.node')].forEach(n => n.remove());
+  elMap = {};
+  const roots = buildTree(current.graph);
+
+  // —— 阶段一：建节点并入 DOM（先不定位），测量真实高度 ——
+  Object.values(nodeMap).forEach(n => {
+    const el = document.createElement('div');
+    el.className = 'node' + (n.id === selectedId ? ' selected' : '');
+    el.dataset.level = n.level;
+    el.style.visibility = 'hidden';
+
+    const badges = [];
+    if (n.tags) badges.push(`<span class="badge tag">${n.tags}</span>`);
+    if (n.knowledgeCategory) badges.push(`<span class="badge">${n.knowledgeCategory}</span>`);
+    if (n.cognitiveDimension) badges.push(`<span class="badge">${n.cognitiveDimension}</span>`);
+
+    el.innerHTML = `<div class="label"><span class="dot"></span><span>${escapeHtml(n.label)}</span></div>` +
+                   (badges.length ? `<div class="badges">${badges.join('')}</div>` : '');
+
+    const kids = childrenMap[n.id];
+    if (kids && kids.length) {
+      const t = document.createElement('div');
+      t.className = 'toggle';
+      t.textContent = collapsed.has(n.id) ? '+' : '−';
+      t.onclick = (ev) => { ev.stopPropagation(); toggle(n.id); };
+      el.appendChild(t);
+    }
+    // 有意见的节点加标记
+    if (current && fbFor(current.lessonId).nodes[n.id]) {
+      const flag = document.createElement('div');
+      flag.className = 'cmt-flag';
+      flag.textContent = '✎';
+      flag.title = '该节点有修改意见';
+      el.appendChild(flag);
+    }
+    el.onclick = () => select(n.id);
+    canvas.appendChild(el);
+    elMap[n.id] = el;
+  });
+  // 测量真实高度/宽度写入 node._h / node._w
+  Object.values(nodeMap).forEach(n => {
+    n._h = elMap[n.id].offsetHeight;
+    n._w = elMap[n.id].offsetWidth;
+  });
+
+  // —— 阶段二：按真实高度布局 ——
+  let cursorY = 0;
+  roots.forEach(r => { cursorY += layout(r, 0, cursorY); });
+
+  // —— 阶段三：算内容包围盒 ——
+  let contentW = 0, contentH = 0;
+  Object.values(nodeMap).forEach(n => {
+    if (n._x === undefined) return;
+    contentW = Math.max(contentW, n._x + (n._w || 200));
+    contentH = Math.max(contentH, n._y + (n._h || NODE_H));
+  });
+
+  // 居中偏移：内容比视口小时居中，否则留固定边距
+  const wrap = canvas.parentElement;      // .canvas-wrap 视口
+  const PAD = 48;
+  const vw = wrap.clientWidth, vh = wrap.clientHeight;
+  const offsetX = Math.max(PAD, (vw - contentW) / 2);
+  const offsetY = Math.max(PAD, (vh - contentH) / 2);
+
+  // —— 阶段四：定位并显示 ——
+  Object.values(nodeMap).forEach(n => {
+    if (n._x === undefined) return;
+    const el = elMap[n.id];
+    el.style.left = (n._x + offsetX) + 'px';
+    el.style.top = (n._y + offsetY) + 'px';
+    el.style.visibility = 'visible';
+  });
+
+  // canvas 至少填满视口，内容超出时按内容+边距撑开
+  canvas.style.width = Math.max(vw, contentW + offsetX + PAD) + 'px';
+  canvas.style.height = Math.max(vh, contentH + offsetY + PAD) + 'px';
+  // 节点已定位，用真实坐标画线（消除偏移）
+  drawEdges();
+}
+
+function drawEdges() {
+  edgesSvg.innerHTML = '';
+  edgesSvg.setAttribute('width', canvas.style.width);
+  edgesSvg.setAttribute('height', canvas.style.height);
+  current.graph.edges.forEach(e => {
+    if (collapsed.has(e.source)) return;
+    const se = elMap[e.source], te = elMap[e.target];
+    if (!se || !te) return;
+    // 读取真实布局坐标：起点=父节点右边缘中点，终点=子节点左边缘中点
+    const x1 = se.offsetLeft + se.offsetWidth;
+    const y1 = se.offsetTop + se.offsetHeight / 2;
+    const x2 = te.offsetLeft;
+    const y2 = te.offsetTop + te.offsetHeight / 2;
+    const mx = (x1 + x2) / 2;
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`);
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', '#3a4761');
+    path.setAttribute('stroke-width', '1.6');
+    edgesSvg.appendChild(path);
+  });
+}
+
+function toggle(id) {
+  if (collapsed.has(id)) collapsed.delete(id); else collapsed.add(id);
+  render();
+}
+
+function select(id) {
+  selectedId = id;
+  render();
+  const n = nodeMap[id];
+  const chips = [];
+  chips.push(`<span class="chip">层级 ${n.level}</span>`);
+  if (n.knowledgeCategory) chips.push(`<span class="chip">${n.knowledgeCategory}</span>`);
+  if (n.cognitiveDimension) chips.push(`<span class="chip">${n.cognitiveDimension}</span>`);
+  if (n.tags) chips.push(`<span class="chip" style="color:var(--l0)">${n.tags}</span>`);
+
+  let html = '';
+  if (n.projectTitle) {
+    html += `<div class="proj-tag">📁 ${escapeHtml(n.projectTitle)}</div>`;
+  }
+  html += `<h2>${escapeHtml(n.label)}</h2>`;
+  if (n.dataHash) html += `<div class="node-hash"># ${n.dataHash}</div>`;
+  if (n.projectDataHash) html += `<div class="node-hash">项目 # ${n.projectDataHash}</div>`;
+  html += `<div class="dl">${chips.join('')}</div>`;
+
+  const desc = n.description || [];
+  if (desc.length) {
+    html += `<div class="sec-title">详细说明（${desc.length} 段）</div>`;
+    desc.forEach(d => {
+      html += `<div class="seg"><div class="txt">${escapeHtml(d.text)}</div>`;
+      if (d.sourceHashes && d.sourceHashes.length) {
+        // 合并段：列出全部源 hash（零丢失可追溯）
+        html += `<div class="hashes">` +
+          d.sourceHashes.map(s => `<div class="hash">${s.dataHash}</div>`).join('') +
+          `</div>`;
+      } else if (d.dataHash) {
+        html += `<div class="hash">${d.dataHash}</div>`;
+      }
+      html += `</div>`;
+    });
+  } else {
+    html += `<div class="sec-title">详细说明</div><div class="empty-hint">该节点为分类/主题节点，无独立正文说明。</div>`;
+  }
+
+  // 节点级批注编辑区
+  const existing = fbFor(current.lessonId).nodes[id];
+  html += `<div class="sec-title">修改意见（该节点）</div>` +
+    `<div class="cmt-box">` +
+    `<textarea id="nodeCmt" placeholder="写下对「${escapeHtml(n.label)}」的修改意见，例如：该节点应为 level 1 / 应删除 / 归类错误…">${existing ? escapeHtml(existing.text) : ''}</textarea>` +
+    `<div class="cmt-actions">` +
+    `<button class="btn primary" id="saveCmtBtn">保存意见</button>` +
+    (existing ? `<button class="btn ghost" id="delCmtBtn">删除</button><span class="cmt-saved">✓ 已记录</span>` : '') +
+    `</div></div>`;
+
+  detail.className = 'detail';
+  detail.innerHTML = html;
+
+  document.getElementById('saveCmtBtn').onclick = () => {
+    const txt = document.getElementById('nodeCmt').value.trim();
+    const store = fbFor(current.lessonId).nodes;
+    if (txt) {
+      store[id] = { label: n.label, level: n.level, text: txt };
+    } else {
+      delete store[id];
+    }
+    updateFbCount(); render(); select(id);
+    showToast(txt ? '已记录该节点意见' : '已清除该节点意见');
+  };
+  const delBtn = document.getElementById('delCmtBtn');
+  if (delBtn) delBtn.onclick = () => {
+    delete fbFor(current.lessonId).nodes[id];
+    updateFbCount(); render(); select(id);
+    showToast('已删除该节点意见');
+  };
+}
+
+function escapeHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// —— 反馈：计数、生成文本、复制 ——
+function countFeedback() {
+  let n = 0;
+  Object.values(feedback).forEach(f => {
+    n += Object.keys(f.nodes).length;
+    if (f.page && f.page.trim()) n += 1;
+  });
+  return n;
+}
+
+function updateFbCount() {
+  const c = countFeedback();
+  const el = document.getElementById('fbCount');
+  el.innerHTML = c ? `已添加 <b>${c}</b> 条意见` : '未添加意见';
+}
+
+function buildFeedbackText() {
+  // 汇总所有有意见的 lesson；只带定位信息 + 意见（正文由大模型自行读 json 定位）
+  const lines = ['# 知识图谱修改意见', ''];
+  let any = false;
+  Object.keys(feedback).forEach(lessonId => {
+    const f = feedback[lessonId];
+    const nodeIds = Object.keys(f.nodes);
+    const hasPage = f.page && f.page.trim();
+    if (!nodeIds.length && !hasPage) return;
+    any = true;
+    lines.push(`## 课程 lessonId: ${lessonId}`);
+    lines.push(`对应文件: output/knowledgegraph/${lessonId}.json`);
+    lines.push('');
+    if (nodeIds.length) {
+      lines.push('### 节点级意见');
+      nodeIds.forEach(nid => {
+        const c = f.nodes[nid];
+        lines.push(`- [节点 ${nid}]「${c.label}」(level ${c.level})`);
+        lines.push(`  意见: ${c.text}`);
+      });
+      lines.push('');
+    }
+    if (hasPage) {
+      lines.push('### 页面级意见');
+      lines.push(`- ${f.page.trim()}`);
+      lines.push('');
+    }
+  });
+  if (!any) return '';
+  lines.push('---');
+  lines.push('请据以上意见对相应 lesson 的 json 二次修改，改后用 validate.py 校验、render.py 重新渲染。');
+  return lines.join('\n');
+}
+
+function copyFeedback() {
+  const text = buildFeedbackText();
+  if (!text) { showToast('尚未添加任何修改意见'); return; }
+  const done = () => showToast('修改意见已复制，粘贴给大模型即可');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+  } else {
+    fallbackCopy(text, done);
+  }
+}
+
+function fallbackCopy(text, done) {
+  const ta = document.createElement('textarea');
+  ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); done(); }
+  catch (e) { showToast('复制失败，请手动选择'); }
+  document.body.removeChild(ta);
+}
+
+let toastTimer = null;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+function loadDataset(idx) {
+  current = DATASETS[idx];
+  collapsed = new Set();
+  selectedId = null;
+  detail.className = 'detail empty';
+  detail.textContent = '点击左侧任意节点查看详细内容';
+  const m = current.meta || {};
+  const rootNode = current.graph.nodes.find(n => n.level === 0) || {};
+  const dc = rootNode.displayCode;
+  metaEl.innerHTML =
+    (dc ? `<span>代码 <b>${escapeHtml(dc)}</b></span>` : '') +
+    `<span>课程 <b>${current.lessonId}</b></span>` +
+    (m.unitId ? `<span>单元 <b>${m.unitId}</b></span>` : '') +
+    (m.textbookId ? `<span>教材 <b>${m.textbookId}</b></span>` : '') +
+    `<span>节点 <b>${current.graph.nodes.length}</b></span>`;
+  // 同步当前课程的页面级意见到输入框
+  const pc = document.getElementById('pageComment');
+  if (pc) pc.value = fbFor(current.lessonId).page || '';
+  render();
+}
+
+// 初始化
+(function init() {
+  const sel = document.getElementById('lessonSelect');
+  if (DATASETS.length > 1) {
+    document.getElementById('switcher').style.display = 'flex';
+    DATASETS.forEach((d, i) => {
+      const o = document.createElement('option');
+      o.value = i;
+      const rootLabel = (d.graph.nodes.find(n => n.level === 0) || {}).label || d.lessonId;
+      o.textContent = `${d.lessonId} · ${rootLabel}`;
+      sel.appendChild(o);
+    });
+    sel.onchange = () => loadDataset(+sel.value);
+  }
+
+  // 页面级意见：实时写入当前课程
+  const pc = document.getElementById('pageComment');
+  pc.addEventListener('input', () => {
+    fbFor(current.lessonId).page = pc.value;
+    updateFbCount();
+  });
+  // 复制 / 清空
+  document.getElementById('copyBtn').onclick = copyFeedback;
+  document.getElementById('clearBtn').onclick = () => {
+    const c = countFeedback();
+    if (!c) { showToast('当前没有意见可清空'); return; }
+    if (!confirm(`确定清空全部 ${c} 条修改意见？`)) return;
+    Object.keys(feedback).forEach(k => delete feedback[k]);
+    pc.value = '';
+    updateFbCount(); render();
+    if (selectedId) select(selectedId);
+    showToast('已清空全部意见');
+  };
+
+  // 窗口尺寸变化时重新布局居中（防抖）
+  let rzTimer = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(rzTimer);
+    rzTimer = setTimeout(() => { if (current) render(); }, 150);
+  });
+
+  loadDataset(0);
+  updateFbCount();
+})();
+</script>
+</body>
+</html>

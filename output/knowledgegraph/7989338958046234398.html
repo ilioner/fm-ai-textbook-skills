@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>知识图谱预览</title>
+<style>
+  :root {
+    --bg: #0f1420;
+    --panel: #171d2b;
+    --panel-2: #1e2637;
+    --line: #2a3548;
+    --text: #e6ebf5;
+    --muted: #8a97ad;
+    --l0: #f5a623;
+    --l1: #4a9eff;
+    --l2: #35d0a5;
+    --accent: #6c8cff;
+    --shadow: 0 6px 24px rgba(0,0,0,.35);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+  }
+  header {
+    padding: 14px 22px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    flex-shrink: 0;
+    box-shadow: var(--shadow);
+    z-index: 10;
+  }
+  header h1 { font-size: 17px; font-weight: 600; letter-spacing: .5px; }
+  header .meta { font-size: 12px; color: var(--muted); display: flex; gap: 14px; }
+  header .meta b { color: var(--text); font-weight: 500; }
+  .switcher { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .switcher select {
+    background: var(--panel-2);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 7px 12px;
+    font-size: 13px;
+    outline: none;
+    cursor: pointer;
+  }
+  .layout { flex: 1; display: flex; min-height: 0; }
+  .canvas-wrap {
+    flex: 1;
+    overflow: auto;
+    position: relative;
+    background:
+      radial-gradient(circle at 1px 1px, rgba(255,255,255,.035) 1px, transparent 0);
+    background-size: 22px 22px;
+  }
+  #canvas { position: relative; }
+  svg.edges { position: absolute; top: 0; left: 0; pointer-events: none; overflow: visible; }
+  .node {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 10px 14px;
+    border-radius: 12px;
+    background: var(--panel-2);
+    border: none;
+    cursor: pointer;
+    transition: transform .12s, box-shadow .12s;
+    max-width: 230px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.25);
+  }
+  .node:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+  .node.selected { box-shadow: 0 0 0 2px var(--accent), var(--shadow); }
+  .node .label { font-size: 14px; font-weight: 600; line-height: 1.35; }
+  .node .badges { display: flex; flex-wrap: wrap; gap: 5px; }
+  .badge {
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 20px;
+    background: rgba(255,255,255,.08);
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .badge.tag { background: rgba(245,166,35,.18); color: var(--l0); }
+  .node .label { display: flex; align-items: flex-start; gap: 7px; }
+  .node .dot {
+    flex-shrink: 0; width: 9px; height: 9px; border-radius: 50%;
+    margin-top: 4px;
+  }
+  .node[data-level="0"] .dot { background: var(--l0); }
+  .node[data-level="1"] .dot { background: var(--l1); }
+  .node[data-level="2"] .dot { background: var(--l2); }
+  .node .toggle {
+    position: absolute;
+    right: -11px; top: 50%;
+    transform: translateY(-50%);
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 13px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    z-index: 3;
+  }
+  .node .toggle:hover { color: var(--text); border-color: var(--accent); }
+  .detail {
+    width: 380px;
+    flex-shrink: 0;
+    background: var(--panel);
+    border-left: 1px solid var(--line);
+    overflow-y: auto;
+    padding: 22px;
+  }
+  .detail.empty { display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 13px; text-align: center; }
+  .detail h2 { font-size: 18px; margin-bottom: 6px; line-height: 1.4; }
+  .detail .dl { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
+  .detail .chip {
+    font-size: 11px; padding: 3px 9px; border-radius: 20px;
+    background: var(--panel-2); color: var(--muted); border: 1px solid var(--line);
+  }
+  .detail .sec-title {
+    font-size: 12px; color: var(--muted); text-transform: uppercase;
+    letter-spacing: .8px; margin: 18px 0 10px; border-bottom: 1px solid var(--line); padding-bottom: 6px;
+  }
+  .seg {
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+  }
+  .seg .txt { font-size: 13px; line-height: 1.7; color: var(--text); white-space: pre-line; }
+  .seg .hashes { margin-top: 8px; display: flex; flex-direction: column; gap: 3px; }
+  .seg .hash {
+    margin-top: 8px; font-size: 10.5px; color: var(--muted);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    word-break: break-all; display: flex; align-items: center; gap: 6px;
+  }
+  .seg .hash::before { content: "#"; color: var(--l2); font-weight: 700; }
+  .node-hash {
+    font-size: 10.5px; color: var(--muted);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    word-break: break-all; margin-bottom: 4px;
+  }
+  .empty-hint { color: var(--muted); font-size: 12.5px; font-style: italic; }
+  .proj-tag {
+    display: inline-block; font-size: 12px; color: var(--l0);
+    background: rgba(245,166,35,.12); border: 1px solid rgba(245,166,35,.3);
+    padding: 4px 10px; border-radius: 8px; margin-bottom: 10px;
+  }
+  /* 批注编辑区（节点详情面板内） */
+  .cmt-box { margin-top: 6px; }
+  .cmt-box textarea {
+    width: 100%; min-height: 62px; resize: vertical;
+    background: var(--bg); color: var(--text);
+    border: 1px solid var(--line); border-radius: 8px;
+    padding: 9px 11px; font-size: 13px; line-height: 1.6; outline: none;
+    font-family: inherit;
+  }
+  .cmt-box textarea:focus { border-color: var(--accent); }
+  .cmt-actions { display: flex; gap: 8px; margin-top: 8px; align-items: center; }
+  .btn {
+    font-size: 12.5px; padding: 6px 13px; border-radius: 8px; cursor: pointer;
+    border: 1px solid var(--line); background: var(--panel-2); color: var(--text);
+    transition: all .12s;
+  }
+  .btn:hover { border-color: var(--accent); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.ghost { background: transparent; color: var(--muted); }
+  .cmt-saved { font-size: 11.5px; color: var(--l2); }
+  /* 有意见的节点右上角标记 */
+  .node .cmt-flag {
+    position: absolute; left: -7px; top: -7px;
+    width: 18px; height: 18px; border-radius: 50%;
+    background: var(--l0); color: #1a1200; font-size: 11px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 2px 6px rgba(0,0,0,.4); z-index: 4;
+  }
+  /* 底部反馈栏 */
+  .feedback-bar {
+    position: fixed; left: 0; right: 380px; bottom: 0;
+    background: var(--panel); border-top: 1px solid var(--line);
+    padding: 10px 22px; display: flex; align-items: center; gap: 14px;
+    box-shadow: 0 -4px 20px rgba(0,0,0,.3); z-index: 20;
+  }
+  .feedback-bar .fb-page {
+    flex: 1; background: var(--bg); color: var(--text);
+    border: 1px solid var(--line); border-radius: 8px;
+    padding: 8px 12px; font-size: 13px; outline: none; font-family: inherit;
+  }
+  .feedback-bar .fb-page:focus { border-color: var(--accent); }
+  .feedback-bar .fb-count { font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .feedback-bar .fb-count b { color: var(--l0); }
+  .canvas-wrap { padding-bottom: 56px; }
+  .toast {
+    position: fixed; bottom: 70px; left: 50%; transform: translateX(-50%);
+    background: var(--l2); color: #04231a; padding: 10px 20px; border-radius: 10px;
+    font-size: 13px; font-weight: 600; opacity: 0; transition: opacity .25s;
+    pointer-events: none; z-index: 50; box-shadow: var(--shadow);
+  }
+  .toast.show { opacity: 1; }
+  .legend { display: flex; gap: 16px; font-size: 11.5px; color: var(--muted); align-items: center; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>📚 知识图谱预览</h1>
+  <div class="meta" id="meta"></div>
+  <div class="legend">
+    <span><i style="background:var(--l0)"></i>层级0 主题</span>
+    <span><i style="background:var(--l1)"></i>层级1 分类</span>
+    <span><i style="background:var(--l2)"></i>层级2 知识点</span>
+  </div>
+  <div class="switcher" id="switcher" style="display:none">
+    <label style="font-size:12px;color:var(--muted)">选择课程</label>
+    <select id="lessonSelect"></select>
+  </div>
+</header>
+<div class="layout">
+  <div class="canvas-wrap">
+    <div id="canvas">
+      <svg class="edges" id="edges"></svg>
+    </div>
+  </div>
+  <div class="detail empty" id="detail">点击左侧任意节点查看详细内容</div>
+</div>
+
+<div class="feedback-bar">
+  <input class="fb-page" id="pageComment" type="text"
+         placeholder="对本课程的整体修改意见（页面级）…如：空域知识下 6 个子节点顺序需调整" />
+  <span class="fb-count" id="fbCount">未添加意见</span>
+  <button class="btn ghost" id="clearBtn">清空</button>
+  <button class="btn primary" id="copyBtn">📋 复制修改意见</button>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+// 数据由 render.py 注入：数组，每项 { lessonId, meta:{textbookId,unitId,lessonId}, graph:{nodes,edges} }
+const DATASETS = [{"lessonId": "7989338958046234398", "meta": {"lessonId": "7989338958046234398"}, "graph": {"nodes": [{"id": "7989338958046234398", "label": "任务2 无人机在应急救援具体场景中的应用", "level": 0, "dataHash": "fm-doc-id-a26a3267828ef464", "displayCode": "UAS_P7T2", "knowledgeCategory": "元认知", "cognitiveDimension": "理解"}, {"id": "7989338958046234398_n1", "label": "无人机在建筑火灾救援中的应用", "level": 1, "dataHash": "fm-doc-id-2c738fc6518f3ffb", "description": [{"text": "建筑物按使用性质可分为居住建筑、公共建筑、工业建筑、农业建筑等。据统计，我国每年发生建筑火灾约30万起，多数建筑火灾造成交通拥堵、扑救困难、伤亡惨重等后果。随着无人机载重能力、稳定性能、安全等性能的提升，无人机在建筑火灾救援中发挥越来越重要的作用。", "dataHash": "fm-doc-id-fcab42c05653f860"}, {"text": "无人机在建筑火灾救援中主要有以下几个方面的应用。", "dataHash": "fm-doc-id-eefa34b88b6b554e"}, {"text": "（1）现场灾情侦察。", "dataHash": "fm-doc-id-2952f6c93e74787f"}, {"text": "建筑火灾救援中，无人机的侦察监测任务主要是判断起火建筑、起火物资、燃烧程度、交通道路、现场环境等。无人机的侦察监测可以全方位地进行，可不间断监测燃烧范围，辅助评估蔓延趋势，搜索被困人员，监测邻近爆炸、毒害等重点部位信息，使灭火救援作战达到“救人第一、科学施救”的指导思想。无人机起飞后，拍摄多张照片并自动拼接一线的全景照片，后台可拖动、放大查看一线现场照片，完成360°无死角观察。", "dataHash": "fm-doc-id-4d1227f63292ded7"}, {"text": "（2）现场视频回传。", "dataHash": "fm-doc-id-a529c88858c5224a"}, {"text": "无人机可将现场空中俯拍画面接入现场指挥车，通过卫星等方式，回传到指挥中心。指挥中心通过一线空中视频画面，可对救灾现场进行统筹和指挥。", "dataHash": "fm-doc-id-134b7d0a1d69d97f"}, {"text": "无人机可悬停于现场，直观了解一线灾情，最高飞行高度可达500m，对大范围的灾区，可进行较为直观的图像采集。", "dataHash": "fm-doc-id-5aad913e95e929c8"}, {"text": "（3）定位火点。", "dataHash": "fm-doc-id-8cde23e9388aab93"}, {"text": "消防员抵达火灾现场，快速操作无人机，飞抵火场上空进行侦察，利用无人机的可见光与红外热成像相结合，进行火场测温，快速定位火点，将信息回传至后台指挥中心，实现信息共享。", "dataHash": "fm-doc-id-88c8409755aac455"}], "knowledgeCategory": "概念性", "cognitiveDimension": "理解", "tags": "重点"}, {"id": "7989338958046234398_n2", "label": "无人机在危险化学品事故救援中的应用", "level": 1, "dataHash": "fm-doc-id-478c8d5ffbb7ef71", "description": [{"text": "危险化学品事故是指因危险化学品造成人员伤亡、财产损失或环境污染的事故。危险化学品事故危害大、易伤亡、处置难。无人机机动灵活、操作简便、成本较低，在危险化学品事故救援中发挥了独特作用。随着无人机性能的提升，其在危险化学品事故救援中发挥的作用越来越凸显。常见的危险化学品主要有液化石油气、氯气、氨气、易燃可燃液体等。不同的危险化学品理化性质各异，同一种危险化学品在不同状态、不同温度，其危险性也各异。其应用主要体现在以下几个方面上。", "dataHash": "fm-doc-id-9adbe07c53bb37e9"}, {"text": "（1）侦察监测。", "dataHash": "fm-doc-id-495b1dc01261c7df"}, {"text": "无人机在危险化学品事故救援中的侦察监测任务是侦察事故现场范围、重点部位、蔓延趋势，监测事故现场的空气、水质、气象、温度等信息，为现场指挥部提供决策的依据，提高救援效率。", "dataHash": "fm-doc-id-a4f32b086d219365"}, {"text": "（2）环境侦检。", "dataHash": "fm-doc-id-e74d5ccdaf427e27"}, {"text": "危险化学品事故救援现场，无人机可利用红外线热成像等进行环境温度侦检，搭载的高性能模拟图像传输系统可以实时传输红外线热成像的影像并可实时测绘出现场的温度信息，利用热成像模块判明现场高温中心位置、事故扩散蔓延趋势等，并进行精确定位，帮助消防员及时判明事故发展态势。", "dataHash": "fm-doc-id-6c66e82d9fe074bb"}], "knowledgeCategory": "概念性", "cognitiveDimension": "理解"}, {"id": "7989338958046234398_n3", "label": "无人机在森林火灾救援中的应用", "level": 1, "dataHash": "fm-doc-id-50ef86866b4fcfd9", "description": [{"text": "森林火灾一直是一个世界性难题。全球每年发生森林火灾20多万起，烧毁的森林面积约占全球总面积的1‰以上。森林火灾发生地域通常其地形和环境较为复杂，道路交通、网络通信条件差，火灾处置救助较为困难。无人机具有体积小、造价低、使用方便、对环境要求低的特点，可凭借自身优势与森林火灾救援任务深度结合，完成灾情侦测、物资投送、通信中继、辅助灭火等任务，对于提高救援效率具有重要意义。其实际应用方式具体如下。", "dataHash": "fm-doc-id-8be69b4e5518882a"}, {"text": "（1）灾情侦测。", "dataHash": "fm-doc-id-5efa2f908f8e0609"}, {"text": "在森林灭火救援行动中，采用无人机开展灾情侦测，获取灾情信息，为科学安全高效开展灭火救援行动提供了重要的信息决策参考。在森林灭火救援行动中开展灾情侦测，按照实时性和侦测手段可分为实时监测与航测勘察。", "dataHash": "fm-doc-id-4aac022d6812051b"}, {"text": "（2）物资投送。", "dataHash": "fm-doc-id-d037c79bb96148b8"}, {"text": "在森林灭火救援行动中，往往需要大量的保障人员翻山越岭，运送食物、饮用水、灭火用水、油料等，费时费力，效率低下。利用无人机进行灭火救援物资投送时，高效、快速是无人机在森林灭火救援应用中一个重要的方向。", "dataHash": "fm-doc-id-a5c82ee07d6c468c"}, {"text": "（3）通信中继。", "dataHash": "fm-doc-id-40d51e8ebcc00fd0"}, {"text": "森林灭火救援地形环境复杂，受植被影响，通信距离短、盲区多。通过无人机中继可以有效扩大通信覆盖范围。", "dataHash": "fm-doc-id-8670be7d224d3137"}, {"text": "（4）无人机灭火。", "dataHash": "fm-doc-id-6a7f46c97e23ad44"}, {"text": "森林灭火救援行动危险性高。近年来发生多起消防员伤亡事故，令人悲痛。利用无人机灭火可以减少人与火直接对抗，特别是在起火的初期，利用无人机可以早发现并快速出动打击。无人机灭火对悬崖、陡坡、飞火等特殊类火点可以快速高效处置，提高处置效率，减少人员伤亡。", "dataHash": "fm-doc-id-70aa95e3e2cd74c7"}], "knowledgeCategory": "概念性", "cognitiveDimension": "理解"}, {"id": "7989338958046234398_n4", "label": "无人机在地震灾害救援中的应用", "level": 1, "dataHash": "fm-doc-id-ee5c9dcc8de86e51", "description": [{"text": "地震灾害发生时，往往会伴随山体滑坡、堰塞湖、建筑物倒塌等灾情发生。交通受阻，电力、网络条件被破坏，救助处置对时间效率要求高。在地震灾害中，可通过无人机快速侦察灾情、获取灾害现场信息，开展灾区测绘、评估灾情情况，展开辅助救援、投送紧急物资，对于制定救援方案、实施救援行动、争取“黄金”救援时间具有重要意义。无人机在地震中应用的主要方式如下。", "dataHash": "fm-doc-id-78e4ec1dbc916cb3"}, {"text": "（1）灾情侦察。", "dataHash": "fm-doc-id-79b83289113c33b7"}, {"text": "地震灾害发生后，灾区地貌发生巨大变化，余震频繁发生。山体滑坡、泥石流等造成的建筑、公路、桥梁等的变化，使普通救援方式对灾情的实时监测十分困难。无人机可凭借不受道路、地形限制的优点快速到达灾区，开展灾情侦察任务，并回传灾情信息，为救援行动展开提供参考。", "dataHash": "fm-doc-id-c7e745e1943f61a5"}, {"text": "（2）灾区航测。", "dataHash": "fm-doc-id-9abbf8966f2ec3b1"}, {"text": "无人机灾区航测是地震灾害监测中的一种重要应用方式。在山体滑坡、泥石流等灾害中，通过无人机航测可以快速获取灾害区域的倾斜摄影影像数据，并经过专业软件处理生成实景三维模型，用于灾害体距离、面积、体积等精确量测，为制定救援方案提供依据。在地震灾害中，通过无人机航测获取二维正射影像图或实景三维模型，可为重大地震灾害救援及灾后恢复重建提供技术支持和决策依据。", "dataHash": "fm-doc-id-5c72e063f7d67f9a"}, {"text": "（3）辅助救援。", "dataHash": "fm-doc-id-e42753acd074fcce"}, {"text": "地震灾害中，无人机辅助救援主要包括辅助照明、物资投送、防疫消毒、通信中继等。", "dataHash": "fm-doc-id-d012529bd065264f"}], "knowledgeCategory": "概念性", "cognitiveDimension": "理解"}, {"id": "7989338958046234398_n5", "label": "无人机在洪涝灾害救援中的应用", "level": 1, "dataHash": "fm-doc-id-401de883a56d4653", "description": [{"text": "洪涝灾害往往具有发生区域面积大、断网断电、交通不便等特点，是夏季常见的主要灾害之一。在洪涝灾害中，通过无人机可以实现灾情的快速侦测、被困人员的快速搜索、轻小型救援物资器材的快速投送等，通过大型长航时无人机还可以实现大范围的应急通信保障，对于灾区信息互通具有重要意义。随着无人机抗风、抗雨能力的增强与整体性能的提升，无人机在洪涝灾害救援中也发挥着越来越重要的作用。其应用如下。", "dataHash": "fm-doc-id-acf6088e7cc470e7"}, {"text": "（1）灾情侦察。", "dataHash": "fm-doc-id-79b83289113c33b7"}, {"text": "（2）应急航测。", "dataHash": "fm-doc-id-f4b1f969b7e4da13"}, {"text": "（3）人员搜救。", "dataHash": "fm-doc-id-dded61de16936448"}, {"text": "（4）灾情评估。", "dataHash": "fm-doc-id-3a1906499dbc758a"}, {"text": "（5）灾后防疫消杀。", "dataHash": "fm-doc-id-209535270b9f2bcb"}], "knowledgeCategory": "概念性", "cognitiveDimension": "理解"}], "edges": [{"source": "7989338958046234398", "target": "7989338958046234398_n1", "type": "父子", "description": "任务2 无人机在应急救援具体场景中的应用包含无人机在建筑火灾救援中的应用"}, {"source": "7989338958046234398", "target": "7989338958046234398_n2", "type": "父子", "description": "任务2 无人机在应急救援具体场景中的应用包含无人机在危险化学品事故救援中的应用"}, {"source": "7989338958046234398", "target": "7989338958046234398_n3", "type": "父子", "description": "任务2 无人机在应急救援具体场景中的应用包含无人机在森林火灾救援中的应用"}, {"source": "7989338958046234398", "target": "7989338958046234398_n4", "type": "父子", "description": "任务2 无人机在应急救援具体场景中的应用包含无人机在地震灾害救援中的应用"}, {"source": "7989338958046234398", "target": "7989338958046234398_n5", "type": "父子", "description": "任务2 无人机在应急救援具体场景中的应用包含无人机在洪涝灾害救援中的应用"}]}}];
+
+const COL_W = 300;      // 层级横向间距
+const NODE_H = 62;      // 单节点占位高度
+const V_GAP = 16;       // 兄弟节点垂直间距
+const canvas = document.getElementById('canvas');
+const edgesSvg = document.getElementById('edges');
+const detail = document.getElementById('detail');
+const metaEl = document.getElementById('meta');
+
+let current = null;      // 当前数据集
+let nodeMap = {};        // id -> node
+let childrenMap = {};    // id -> [childId]
+let elMap = {};          // id -> DOM 元素（用于读取真实坐标画线）
+let collapsed = new Set();
+let selectedId = null;
+
+// 批注存储：按 lessonId 分组。{ [lessonId]: { nodes: {nodeId:{label,level,text}}, page: "" } }
+// 存在内存中（纯静态页，无需后端）。切换 lesson 不丢，复制时汇总所有有意见的 lesson。
+const feedback = {};
+function fbFor(lessonId) {
+  if (!feedback[lessonId]) feedback[lessonId] = { nodes: {}, page: "" };
+  return feedback[lessonId];
+}
+
+function buildTree(graph) {
+  nodeMap = {};
+  childrenMap = {};
+  graph.nodes.forEach(n => { nodeMap[n.id] = n; childrenMap[n.id] = []; });
+  graph.edges.forEach(e => {
+    if (childrenMap[e.source]) childrenMap[e.source].push(e.target);
+  });
+  // 根 = level 0，或无入边的节点
+  const hasParent = new Set(graph.edges.map(e => e.target));
+  return graph.nodes.filter(n => n.level === 0 || !hasParent.has(n.id)).map(n => n.id);
+}
+
+// 递归布局：用节点真实高度 node._h 计算占位，返回子树总高度，写入 node._x/_y。
+// node._y 为该节点顶端 y 坐标；节点垂直居中对齐其子树跨度。
+function layout(id, depth, cursorY) {
+  const node = nodeMap[id];
+  node._x = depth * COL_W;
+  const selfH = (node._h || NODE_H) + V_GAP;
+  const kids = collapsed.has(id) ? [] : childrenMap[id];
+  if (kids.length === 0) {
+    node._y = cursorY;
+    return selfH;
+  }
+  let y = cursorY;
+  let total = 0;
+  kids.forEach(k => {
+    const h = layout(k, depth + 1, y);
+    y += h; total += h;
+  });
+  // 父节点中心对齐首末子节点中心
+  const first = nodeMap[kids[0]];
+  const last = nodeMap[kids[kids.length - 1]];
+  const kidsMid = (first._y + (first._h || NODE_H) / 2 + last._y + (last._h || NODE_H) / 2) / 2;
+  node._y = kidsMid - (node._h || NODE_H) / 2;
+  // 子树可能比父节点自身矮，取较大者
+  return Math.max(total, selfH);
+}
+
+function render() {
+  // 清空旧节点（保留 svg）
+  [...canvas.querySelectorAll('.node')].forEach(n => n.remove());
+  elMap = {};
+  const roots = buildTree(current.graph);
+
+  // —— 阶段一：建节点并入 DOM（先不定位），测量真实高度 ——
+  Object.values(nodeMap).forEach(n => {
+    const el = document.createElement('div');
+    el.className = 'node' + (n.id === selectedId ? ' selected' : '');
+    el.dataset.level = n.level;
+    el.style.visibility = 'hidden';
+
+    const badges = [];
+    if (n.tags) badges.push(`<span class="badge tag">${n.tags}</span>`);
+    if (n.knowledgeCategory) badges.push(`<span class="badge">${n.knowledgeCategory}</span>`);
+    if (n.cognitiveDimension) badges.push(`<span class="badge">${n.cognitiveDimension}</span>`);
+
+    el.innerHTML = `<div class="label"><span class="dot"></span><span>${escapeHtml(n.label)}</span></div>` +
+                   (badges.length ? `<div class="badges">${badges.join('')}</div>` : '');
+
+    const kids = childrenMap[n.id];
+    if (kids && kids.length) {
+      const t = document.createElement('div');
+      t.className = 'toggle';
+      t.textContent = collapsed.has(n.id) ? '+' : '−';
+      t.onclick = (ev) => { ev.stopPropagation(); toggle(n.id); };
+      el.appendChild(t);
+    }
+    // 有意见的节点加标记
+    if (current && fbFor(current.lessonId).nodes[n.id]) {
+      const flag = document.createElement('div');
+      flag.className = 'cmt-flag';
+      flag.textContent = '✎';
+      flag.title = '该节点有修改意见';
+      el.appendChild(flag);
+    }
+    el.onclick = () => select(n.id);
+    canvas.appendChild(el);
+    elMap[n.id] = el;
+  });
+  // 测量真实高度/宽度写入 node._h / node._w
+  Object.values(nodeMap).forEach(n => {
+    n._h = elMap[n.id].offsetHeight;
+    n._w = elMap[n.id].offsetWidth;
+  });
+
+  // —— 阶段二：按真实高度布局 ——
+  let cursorY = 0;
+  roots.forEach(r => { cursorY += layout(r, 0, cursorY); });
+
+  // —— 阶段三：算内容包围盒 ——
+  let contentW = 0, contentH = 0;
+  Object.values(nodeMap).forEach(n => {
+    if (n._x === undefined) return;
+    contentW = Math.max(contentW, n._x + (n._w || 200));
+    contentH = Math.max(contentH, n._y + (n._h || NODE_H));
+  });
+
+  // 居中偏移：内容比视口小时居中，否则留固定边距
+  const wrap = canvas.parentElement;      // .canvas-wrap 视口
+  const PAD = 48;
+  const vw = wrap.clientWidth, vh = wrap.clientHeight;
+  const offsetX = Math.max(PAD, (vw - contentW) / 2);
+  const offsetY = Math.max(PAD, (vh - contentH) / 2);
+
+  // —— 阶段四：定位并显示 ——
+  Object.values(nodeMap).forEach(n => {
+    if (n._x === undefined) return;
+    const el = elMap[n.id];
+    el.style.left = (n._x + offsetX) + 'px';
+    el.style.top = (n._y + offsetY) + 'px';
+    el.style.visibility = 'visible';
+  });
+
+  // canvas 至少填满视口，内容超出时按内容+边距撑开
+  canvas.style.width = Math.max(vw, contentW + offsetX + PAD) + 'px';
+  canvas.style.height = Math.max(vh, contentH + offsetY + PAD) + 'px';
+  // 节点已定位，用真实坐标画线（消除偏移）
+  drawEdges();
+}
+
+function drawEdges() {
+  edgesSvg.innerHTML = '';
+  edgesSvg.setAttribute('width', canvas.style.width);
+  edgesSvg.setAttribute('height', canvas.style.height);
+  current.graph.edges.forEach(e => {
+    if (collapsed.has(e.source)) return;
+    const se = elMap[e.source], te = elMap[e.target];
+    if (!se || !te) return;
+    // 读取真实布局坐标：起点=父节点右边缘中点，终点=子节点左边缘中点
+    const x1 = se.offsetLeft + se.offsetWidth;
+    const y1 = se.offsetTop + se.offsetHeight / 2;
+    const x2 = te.offsetLeft;
+    const y2 = te.offsetTop + te.offsetHeight / 2;
+    const mx = (x1 + x2) / 2;
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`);
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', '#3a4761');
+    path.setAttribute('stroke-width', '1.6');
+    edgesSvg.appendChild(path);
+  });
+}
+
+function toggle(id) {
+  if (collapsed.has(id)) collapsed.delete(id); else collapsed.add(id);
+  render();
+}
+
+function select(id) {
+  selectedId = id;
+  render();
+  const n = nodeMap[id];
+  const chips = [];
+  chips.push(`<span class="chip">层级 ${n.level}</span>`);
+  if (n.knowledgeCategory) chips.push(`<span class="chip">${n.knowledgeCategory}</span>`);
+  if (n.cognitiveDimension) chips.push(`<span class="chip">${n.cognitiveDimension}</span>`);
+  if (n.tags) chips.push(`<span class="chip" style="color:var(--l0)">${n.tags}</span>`);
+
+  let html = '';
+  if (n.projectTitle) {
+    html += `<div class="proj-tag">📁 ${escapeHtml(n.projectTitle)}</div>`;
+  }
+  html += `<h2>${escapeHtml(n.label)}</h2>`;
+  if (n.dataHash) html += `<div class="node-hash"># ${n.dataHash}</div>`;
+  if (n.projectDataHash) html += `<div class="node-hash">项目 # ${n.projectDataHash}</div>`;
+  html += `<div class="dl">${chips.join('')}</div>`;
+
+  const desc = n.description || [];
+  if (desc.length) {
+    html += `<div class="sec-title">详细说明（${desc.length} 段）</div>`;
+    desc.forEach(d => {
+      html += `<div class="seg"><div class="txt">${escapeHtml(d.text)}</div>`;
+      if (d.sourceHashes && d.sourceHashes.length) {
+        // 合并段：列出全部源 hash（零丢失可追溯）
+        html += `<div class="hashes">` +
+          d.sourceHashes.map(s => `<div class="hash">${s.dataHash}</div>`).join('') +
+          `</div>`;
+      } else if (d.dataHash) {
+        html += `<div class="hash">${d.dataHash}</div>`;
+      }
+      html += `</div>`;
+    });
+  } else {
+    html += `<div class="sec-title">详细说明</div><div class="empty-hint">该节点为分类/主题节点，无独立正文说明。</div>`;
+  }
+
+  // 节点级批注编辑区
+  const existing = fbFor(current.lessonId).nodes[id];
+  html += `<div class="sec-title">修改意见（该节点）</div>` +
+    `<div class="cmt-box">` +
+    `<textarea id="nodeCmt" placeholder="写下对「${escapeHtml(n.label)}」的修改意见，例如：该节点应为 level 1 / 应删除 / 归类错误…">${existing ? escapeHtml(existing.text) : ''}</textarea>` +
+    `<div class="cmt-actions">` +
+    `<button class="btn primary" id="saveCmtBtn">保存意见</button>` +
+    (existing ? `<button class="btn ghost" id="delCmtBtn">删除</button><span class="cmt-saved">✓ 已记录</span>` : '') +
+    `</div></div>`;
+
+  detail.className = 'detail';
+  detail.innerHTML = html;
+
+  document.getElementById('saveCmtBtn').onclick = () => {
+    const txt = document.getElementById('nodeCmt').value.trim();
+    const store = fbFor(current.lessonId).nodes;
+    if (txt) {
+      store[id] = { label: n.label, level: n.level, text: txt };
+    } else {
+      delete store[id];
+    }
+    updateFbCount(); render(); select(id);
+    showToast(txt ? '已记录该节点意见' : '已清除该节点意见');
+  };
+  const delBtn = document.getElementById('delCmtBtn');
+  if (delBtn) delBtn.onclick = () => {
+    delete fbFor(current.lessonId).nodes[id];
+    updateFbCount(); render(); select(id);
+    showToast('已删除该节点意见');
+  };
+}
+
+function escapeHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// —— 反馈：计数、生成文本、复制 ——
+function countFeedback() {
+  let n = 0;
+  Object.values(feedback).forEach(f => {
+    n += Object.keys(f.nodes).length;
+    if (f.page && f.page.trim()) n += 1;
+  });
+  return n;
+}
+
+function updateFbCount() {
+  const c = countFeedback();
+  const el = document.getElementById('fbCount');
+  el.innerHTML = c ? `已添加 <b>${c}</b> 条意见` : '未添加意见';
+}
+
+function buildFeedbackText() {
+  // 汇总所有有意见的 lesson；只带定位信息 + 意见（正文由大模型自行读 json 定位）
+  const lines = ['# 知识图谱修改意见', ''];
+  let any = false;
+  Object.keys(feedback).forEach(lessonId => {
+    const f = feedback[lessonId];
+    const nodeIds = Object.keys(f.nodes);
+    const hasPage = f.page && f.page.trim();
+    if (!nodeIds.length && !hasPage) return;
+    any = true;
+    lines.push(`## 课程 lessonId: ${lessonId}`);
+    lines.push(`对应文件: output/knowledgegraph/${lessonId}.json`);
+    lines.push('');
+    if (nodeIds.length) {
+      lines.push('### 节点级意见');
+      nodeIds.forEach(nid => {
+        const c = f.nodes[nid];
+        lines.push(`- [节点 ${nid}]「${c.label}」(level ${c.level})`);
+        lines.push(`  意见: ${c.text}`);
+      });
+      lines.push('');
+    }
+    if (hasPage) {
+      lines.push('### 页面级意见');
+      lines.push(`- ${f.page.trim()}`);
+      lines.push('');
+    }
+  });
+  if (!any) return '';
+  lines.push('---');
+  lines.push('请据以上意见对相应 lesson 的 json 二次修改，改后用 validate.py 校验、render.py 重新渲染。');
+  return lines.join('\n');
+}
+
+function copyFeedback() {
+  const text = buildFeedbackText();
+  if (!text) { showToast('尚未添加任何修改意见'); return; }
+  const done = () => showToast('修改意见已复制，粘贴给大模型即可');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+  } else {
+    fallbackCopy(text, done);
+  }
+}
+
+function fallbackCopy(text, done) {
+  const ta = document.createElement('textarea');
+  ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); done(); }
+  catch (e) { showToast('复制失败，请手动选择'); }
+  document.body.removeChild(ta);
+}
+
+let toastTimer = null;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+function loadDataset(idx) {
+  current = DATASETS[idx];
+  collapsed = new Set();
+  selectedId = null;
+  detail.className = 'detail empty';
+  detail.textContent = '点击左侧任意节点查看详细内容';
+  const m = current.meta || {};
+  const rootNode = current.graph.nodes.find(n => n.level === 0) || {};
+  const dc = rootNode.displayCode;
+  metaEl.innerHTML =
+    (dc ? `<span>代码 <b>${escapeHtml(dc)}</b></span>` : '') +
+    `<span>课程 <b>${current.lessonId}</b></span>` +
+    (m.unitId ? `<span>单元 <b>${m.unitId}</b></span>` : '') +
+    (m.textbookId ? `<span>教材 <b>${m.textbookId}</b></span>` : '') +
+    `<span>节点 <b>${current.graph.nodes.length}</b></span>`;
+  // 同步当前课程的页面级意见到输入框
+  const pc = document.getElementById('pageComment');
+  if (pc) pc.value = fbFor(current.lessonId).page || '';
+  render();
+}
+
+// 初始化
+(function init() {
+  const sel = document.getElementById('lessonSelect');
+  if (DATASETS.length > 1) {
+    document.getElementById('switcher').style.display = 'flex';
+    DATASETS.forEach((d, i) => {
+      const o = document.createElement('option');
+      o.value = i;
+      const rootLabel = (d.graph.nodes.find(n => n.level === 0) || {}).label || d.lessonId;
+      o.textContent = `${d.lessonId} · ${rootLabel}`;
+      sel.appendChild(o);
+    });
+    sel.onchange = () => loadDataset(+sel.value);
+  }
+
+  // 页面级意见：实时写入当前课程
+  const pc = document.getElementById('pageComment');
+  pc.addEventListener('input', () => {
+    fbFor(current.lessonId).page = pc.value;
+    updateFbCount();
+  });
+  // 复制 / 清空
+  document.getElementById('copyBtn').onclick = copyFeedback;
+  document.getElementById('clearBtn').onclick = () => {
+    const c = countFeedback();
+    if (!c) { showToast('当前没有意见可清空'); return; }
+    if (!confirm(`确定清空全部 ${c} 条修改意见？`)) return;
+    Object.keys(feedback).forEach(k => delete feedback[k]);
+    pc.value = '';
+    updateFbCount(); render();
+    if (selectedId) select(selectedId);
+    showToast('已清空全部意见');
+  };
+
+  // 窗口尺寸变化时重新布局居中（防抖）
+  let rzTimer = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(rzTimer);
+    rzTimer = setTimeout(() => { if (current) render(); }, 150);
+  });
+
+  loadDataset(0);
+  updateFbCount();
+})();
+</script>
+</body>
+</html>

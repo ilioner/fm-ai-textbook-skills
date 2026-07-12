@@ -1,0 +1,4 @@
+interface:
+  display_name: "教材 CardData 抽取"
+  short_description: "逐课理解教材并抽取扁平化知识卡片 JSON 数据"
+  default_prompt: "使用 $extract-card-data 读取 markdown 教材并生成逐课 CardData JSON。"

@@ -1,0 +1,191 @@
+{
+  "nodes": [
+    {
+      "id": "7989338958046233798",
+      "label": "礼仪起源认知",
+      "level": 0,
+      "knowledgeCategory": "元认知",
+      "cognitiveDimension": "理解"
+    },
+    {
+      "id": "7989338958046233798_origin_theories",
+      "label": "礼仪的起源",
+      "level": 1,
+      "tags": "重点",
+      "knowledgeCategory": "概念性",
+      "cognitiveDimension": "理解"
+    },
+    {
+      "id": "7989338958046233798_ot_initial_concept",
+      "label": "“礼”的最初概念",
+      "dataHash": "fm-doc-id-6d6abc8d272ecc55",
+      "description": "“礼”字最早出现在金文里。早期人类为表达对天地鬼神的惧怕和敬仰，通过设计流程、举行仪式、敬献祭品等方式来表达敬畏，这种流程逐渐固化为一种规范，从而产生了“礼”。",
+      "level": 2,
+      "knowledgeCategory": "事实性",
+      "cognitiveDimension": "记忆"
+    },
+    {
+      "id": "7989338958046233798_ot_divine_origin",
+      "label": "起源说一：天神生礼仪",
+      "dataHash": "fm-doc-id-e95e063a3bb9f72e",
+      "description": "该说法认为，礼是用来顺乎天意的，是人们对超自然神灵的崇拜和敬畏，希望通过各种恭敬方式来取悦神灵。",
+      "level": 2,
+      "knowledgeCategory": "概念性",
+      "cognitiveDimension": "理解"
+    },
+    {
+      "id": "7989338958046233798_ot_unity_origin",
+      "label": "起源说二：礼为天地人的统一体",
+      "dataHash": "fm-doc-id-461554ec8b02a856",
+      "description": "该说法认为，“礼之用，和为贵”，礼是为了讲究天地与人之间既相互制约又和谐统一的关系。",
+      "level": 2,
+      "knowledgeCategory": "概念性",
+      "cognitiveDimension": "理解"
+    },
+    {
+      "id": "7989338958046233798_ot_human_nature_origin",
+      "label": "起源说三：礼源于人性说",
+      "dataHash": "fm-doc-id-9196e9dd9d6abc99",
+      "description": "该说法由孔子提出，认为礼起源于人的天性（如“仁者爱人”），是以“仁”为心理依据来处理人际关系的重要原则。",
+      "level": 2,
+      "knowledgeCategory": "概念性",
+      "cognitiveDimension": "理解"
+    },
+    {
+      "id": "7989338958046233798_ot_conflict_origin",
+      "label": "起源说四：礼为人性与环境矛盾的产物",
+      "dataHash": "fm-doc-id-1c5c8ebbcd48baa7",
+      "description": "该说法认为，人有各种欲望，与环境会产生矛盾，需要通过“克己复礼”，即用道德、礼仪等形式对人性进行约束和规范，因此礼是这种矛盾的产物。",
+      "level": 2,
+      "knowledgeCategory": "概念性",
+      "cognitiveDimension": "理解"
+    },
+    {
+      "id": "7989338958046233798_ot_reason_custom_origin",
+      "label": "起源说五：礼生于理，源于俗",
+      "dataHash": "fm-doc-id-f1f5b922359f7801",
+      "description": "该说法认为，礼产生于事物发展的必然道理（理），是人们为生存发展而制定的行为规范；而礼的具体形式（仪）则来源于世故习俗（俗）。",
+      "level": 2,
+      "knowledgeCategory": "概念性",
+      "cognitiveDimension": "理解"
+    },
+    {
+      "id": "7989338958046233798_chinese_etiquette_development",
+      "label": "中国礼仪发展的历程",
+      "level": 1,
+      "tags": "重点",
+      "knowledgeCategory": "事实性",
+      "cognitiveDimension": "记忆"
+    },
+    {
+      "id": "7989338958046233798_ced_stages",
+      "label": "发展历程的四个阶段",
+      "dataHash": "fm-doc-id-65806341669d2391",
+      "description": "我国传统礼仪的发展历程可分为四个阶段：起源于尧舜时期，形成于夏、商、西周三代，变革于春秋战国时期，强化于秦汉到清末时期。",
+      "level": 2,
+      "knowledgeCategory": "事实性",
+      "cognitiveDimension": "记忆"
+    },
+    {
+      "id": "7989338958046233798_ced_zhou_perfection",
+      "label": "周朝的完善与规范",
+      "dataHash": "fm-doc-id-c292a829ce50ae50",
+      "description": "礼仪从周朝开始趋向完善，周朝制定了《周礼》《仪礼》《礼记》，区分贵贱尊卑，使礼仪从治国延伸到规范社会和个人。",
+      "level": 2,
+      "knowledgeCategory": "事实性",
+      "cognitiveDimension": "记忆"
+    },
+    {
+      "id": "7989338958046233798_ced_duke_of_zhou",
+      "label": "周公“制礼作乐”",
+      "dataHash": "fm-doc-id-e4ac7b427130e5e1",
+      "description": "周公建立了周代涉及政治、经济、法律、礼仪等各方面的一系列制度，将礼仪贯穿于所有活动中，建立了一套完整、周密的礼仪系统。",
+      "level": 2,
+      "knowledgeCategory": "事实性",
+      "cognitiveDimension": "记忆"
+    },
+    {
+      "id": "7989338958046233798_ced_confucius",
+      "label": "孔子与“仁”“礼”结合",
+      "dataHash": "fm-doc-id-7d909c88f453881f",
+      "description": "春秋时期，面对“礼崩乐坏”，孔子提出“仁”的思想，并将其与“礼”有机结合，形成了儒家思想体系的核心，构成了儒家的社会道德规范。",
+      "level": 2,
+      "knowledgeCategory": "事实性",
+      "cognitiveDimension": "记忆"
+    }
+  ],
+  "edges": [
+    {
+      "source": "7989338958046233798",
+      "target": "7989338958046233798_origin_theories",
+      "type": "父子",
+      "description": "礼仪起源认知包含对礼仪起源的探讨"
+    },
+    {
+      "source": "7989338958046233798",
+      "target": "7989338958046233798_chinese_etiquette_development",
+      "type": "父子",
+      "description": "礼仪起源认知包含中国礼仪发展的历程"
+    },
+    {
+      "source": "7989338958046233798_origin_theories",
+      "target": "7989338958046233798_ot_initial_concept",
+      "type": "父子",
+      "description": "礼仪的起源包含“礼”的最初概念"
+    },
+    {
+      "source": "7989338958046233798_origin_theories",
+      "target": "7989338958046233798_ot_divine_origin",
+      "type": "父子",
+      "description": "礼仪的起源包括“天神生礼仪”说"
+    },
+    {
+      "source": "7989338958046233798_origin_theories",
+      "target": "7989338958046233798_ot_unity_origin",
+      "type": "父子",
+      "description": "礼仪的起源包括“礼为天地人的统一体”说"
+    },
+    {
+      "source": "7989338958046233798_origin_theories",
+      "target": "7989338958046233798_ot_human_nature_origin",
+      "type": "父子",
+      "description": "礼仪的起源包括“礼源于人性”说"
+    },
+    {
+      "source": "7989338958046233798_origin_theories",
+      "target": "7989338958046233798_ot_conflict_origin",
+      "type": "父子",
+      "description": "礼仪的起源包括“礼为人性与环境矛盾的产物”说"
+    },
+    {
+      "source": "7989338958046233798_origin_theories",
+      "target": "7989338958046233798_ot_reason_custom_origin",
+      "type": "父子",
+      "description": "礼仪的起源包括“礼生于理，源于俗”说"
+    },
+    {
+      "source": "7989338958046233798_chinese_etiquette_development",
+      "target": "7989338958046233798_ced_stages",
+      "type": "父子",
+      "description": "中国礼仪发展历程包括其四个主要阶段"
+    },
+    {
+      "source": "7989338958046233798_chinese_etiquette_development",
+      "target": "7989338958046233798_ced_zhou_perfection",
+      "type": "父子",
+      "description": "中国礼仪发展历程中周朝是完善与规范的重要时期"
+    },
+    {
+      "source": "7989338958046233798_ced_zhou_perfection",
+      "target": "7989338958046233798_ced_duke_of_zhou",
+      "type": "关联",
+      "description": "周公是完善周朝礼仪的关键人物"
+    },
+    {
+      "source": "7989338958046233798_ced_zhou_perfection",
+      "target": "7989338958046233798_ced_confucius",
+      "type": "关联",
+      "description": "孔子在周朝礼仪变革时期起了巨大作用"
+    }
+  ]
+}

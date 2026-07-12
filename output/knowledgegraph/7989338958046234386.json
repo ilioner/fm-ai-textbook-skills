@@ -1,0 +1,253 @@
+{
+  "nodes": [
+    {
+      "id": "7989338958046234386",
+      "label": "任务3 无人机影视航拍案例",
+      "level": 0,
+      "dataHash": "fm-doc-id-a6b614d969ad57bc",
+      "displayCode": "UAS_P3T3",
+      "knowledgeCategory": "元认知",
+      "cognitiveDimension": "理解"
+    },
+    {
+      "id": "7989338958046234386_n1",
+      "label": "学校运动会航拍案例",
+      "level": 1,
+      "dataHash": "fm-doc-id-5c38e25607c7dc8e",
+      "description": [
+        {
+          "text": "在拍摄前，我们需要选好操控位置，确保可以观察到飞行拍摄时可能遇到的障碍物，并调整好航拍器的方向，确定拍摄画面范围，完成画面构图。",
+          "dataHash": "fm-doc-id-c2c83853867f1184"
+        }
+      ],
+      "knowledgeCategory": "程序性",
+      "cognitiveDimension": "应用"
+    },
+    {
+      "id": "7989338958046234386_n2",
+      "label": "国旗方阵正向主席台走来",
+      "level": 2,
+      "dataHash": "fm-doc-id-0a82306672adc55b",
+      "description": [
+        {
+          "text": "该场景使用静态镜头拍摄——启动电机，将右左摇杆慢慢向前推动，无人机缓慢上升，上升至20m左右的高度时，将右左摇杆复原，将无人机悬停在半空中，进行拍摄（图3.3.1）。",
+          "dataHash": "fm-doc-id-8bfa5df97c15c58c"
+        }
+      ],
+      "knowledgeCategory": "程序性",
+      "cognitiveDimension": "应用"
+    },
+    {
+      "id": "7989338958046234386_n3",
+      "label": "篮球场上比赛火热进行，边上同学为选手加油打气",
+      "level": 2,
+      "dataHash": "fm-doc-id-2103cb7c40b4760e",
+      "description": [
+        {
+          "text": "该场景使用摇镜头拍摄——与静态镜头一样，将无人机悬停在20m左右的高度，轻轻向右拨动左摇杆，使无人机向右旋转，实现镜头从左到右摇动拍摄（图3.3.2）。",
+          "dataHash": "fm-doc-id-13db7cda34a1fe61"
+        }
+      ],
+      "knowledgeCategory": "程序性",
+      "cognitiveDimension": "应用"
+    },
+    {
+      "id": "7989338958046234386_n4",
+      "label": "跳高赛场上，选手激烈比拼",
+      "level": 2,
+      "dataHash": "fm-doc-id-2c476c9b95baa815",
+      "description": [
+        {
+          "text": "该场景使用俯仰镜头拍摄——将无人机悬停在10m左右的高度，缓慢匀速转动遥控器左上角拨轮，上下摇动镜头，进行拍摄（图3.3.3）。",
+          "dataHash": "fm-doc-id-72577cb2af455062"
+        }
+      ],
+      "knowledgeCategory": "程序性",
+      "cognitiveDimension": "应用"
+    },
+    {
+      "id": "7989338958046234386_n5",
+      "label": "方阵均就位，主席台上人员均就位，运动会马上开始",
+      "level": 2,
+      "dataHash": "fm-doc-id-900065511eaac926",
+      "description": [
+        {
+          "text": "该场景使用推镜头拍摄——将无人机飞升到15m左右的高度，调整遥控器左上角拨轮，保持镜头正对主席台，向前推动右控制杆，控制无人机向前匀速飞行拍摄（图3.3.4）。",
+          "dataHash": "fm-doc-id-f9d7f7c9ecedf9d0"
+        }
+      ],
+      "knowledgeCategory": "程序性",
+      "cognitiveDimension": "应用"
+    },
+    {
+      "id": "7989338958046234386_n6",
+      "label": "开幕式中，各个方阵依次走过",
+      "level": 2,
+      "dataHash": "fm-doc-id-190110ea0b6ab400",
+      "description": [
+        {
+          "text": "该场景使用移动拍摄——将无人机上升到20m左右的高度，调整遥控器左上角拨轮，保持镜头正对主席台，向前推动右控制杆控制无人机向前匀速飞行拍摄（图3.3.5）。",
+          "dataHash": "fm-doc-id-2f70ee6fbdfd958e"
+        }
+      ],
+      "knowledgeCategory": "程序性",
+      "cognitiveDimension": "应用"
+    },
+    {
+      "id": "7989338958046234386_n7",
+      "label": "学校宣传片航拍案例",
+      "level": 1,
+      "dataHash": "fm-doc-id-0563286eb548cb91",
+      "description": [
+        {
+          "text": "用无人机拍摄校园要先整体，再将有特点的校园建筑局部串联起来，形成一条线，由面及里宣传校园文化，通过无人机的展现拍摄、穿行拍摄、环绕拍摄等拍摄技巧，拍摄出非常鲜活的校园风光。",
+          "dataHash": "fm-doc-id-d569c8f7a7cdfa5d"
+        }
+      ],
+      "knowledgeCategory": "程序性",
+      "cognitiveDimension": "应用"
+    },
+    {
+      "id": "7989338958046234386_n8",
+      "label": "拍摄校园气派的校门风光",
+      "level": 2,
+      "dataHash": "fm-doc-id-93f313cf9683972e",
+      "description": [
+        {
+          "text": "将无人机上升到20m左右的高度，调整遥控器左上角拨轮，镜头正对浙江音乐学院，向前推动右摇杆操控无人机向前飞行，保持稳定，同时拨动遥控器左上角拨轮，慢慢将镜头向上倾斜（图3.3.6）。",
+          "dataHash": "fm-doc-id-eb04ed4a04f92767"
+        },
+        {
+          "text": "图3.3.6　展现拍摄示意图",
+          "dataHash": "fm-doc-id-aaa50420c8af0742"
+        }
+      ],
+      "knowledgeCategory": "程序性",
+      "cognitiveDimension": "应用"
+    },
+    {
+      "id": "7989338958046234386_n9",
+      "label": "模拟进入校园的体验感",
+      "level": 2,
+      "dataHash": "fm-doc-id-7ac4547532392e4c",
+      "knowledgeCategory": "程序性",
+      "cognitiveDimension": "应用"
+    },
+    {
+      "id": "7989338958046234386_n10",
+      "label": "拍摄校园建筑的雄伟外观",
+      "level": 2,
+      "dataHash": "fm-doc-id-d625a6fc4f7731cc",
+      "description": [
+        {
+          "text": "操控技巧：将无人机上升到10m左右的高度，调整拨轮，使镜头对准前方，向前推动左摇杆，操控无人机匀速上升（图3.3.8）。",
+          "dataHash": "fm-doc-id-3b6dd8ba592474a2"
+        }
+      ],
+      "knowledgeCategory": "程序性",
+      "cognitiveDimension": "应用"
+    },
+    {
+      "id": "7989338958046234386_n11",
+      "label": "拍摄校园建筑的全貌",
+      "level": 2,
+      "dataHash": "fm-doc-id-88deb9ac8bbe71a4",
+      "description": [
+        {
+          "text": "操控技巧：将无人机上升至50m左右的高度，调整遥控器左上角拨轮，使镜头对准中间建筑物，向左前方推动右摇杆，从左侧进行侧飞，同时进行左侧的偏航控制，环绕建筑物飞行，整个过程保持镜头对准圆心（图3.3.9）。",
+          "dataHash": "fm-doc-id-ad391b8bd3f57206"
+        }
+      ],
+      "knowledgeCategory": "程序性",
+      "cognitiveDimension": "应用"
+    },
+    {
+      "id": "7989338958046234386_n12",
+      "label": "拍摄整个校园的全貌",
+      "level": 2,
+      "dataHash": "fm-doc-id-5931dc2dd12c1da7",
+      "description": [
+        {
+          "text": "操控技巧：将无人机上升到50m左右的高度，调整遥控器左上角拨轮，使镜头对准被摄建筑物，向左前方推动右摇杆，控制无人机从建筑物左侧向前飞行，当从旁边穿过建筑物时，调整左摇杆，进行偏航操控，始终保持建筑物处在画面中，向左前方推动左摇杆，使无人机做一个掉头，结束时处于相互飞行的状态，沿着之前的飞行轨迹飞离（图3.3.10）。",
+          "dataHash": "fm-doc-id-86e48983f85d004c"
+        }
+      ],
+      "knowledgeCategory": "程序性",
+      "cognitiveDimension": "应用"
+    }
+  ],
+  "edges": [
+    {
+      "source": "7989338958046234386",
+      "target": "7989338958046234386_n1",
+      "type": "父子",
+      "description": "任务3 无人机影视航拍案例包含学校运动会航拍案例"
+    },
+    {
+      "source": "7989338958046234386_n1",
+      "target": "7989338958046234386_n2",
+      "type": "父子",
+      "description": "学校运动会航拍案例包含国旗方阵正向主席台走来"
+    },
+    {
+      "source": "7989338958046234386_n1",
+      "target": "7989338958046234386_n3",
+      "type": "父子",
+      "description": "学校运动会航拍案例包含篮球场上比赛火热进行，边上同学为选手加油打气"
+    },
+    {
+      "source": "7989338958046234386_n1",
+      "target": "7989338958046234386_n4",
+      "type": "父子",
+      "description": "学校运动会航拍案例包含跳高赛场上，选手激烈比拼"
+    },
+    {
+      "source": "7989338958046234386_n1",
+      "target": "7989338958046234386_n5",
+      "type": "父子",
+      "description": "学校运动会航拍案例包含方阵均就位，主席台上人员均就位，运动会马上开始"
+    },
+    {
+      "source": "7989338958046234386_n1",
+      "target": "7989338958046234386_n6",
+      "type": "父子",
+      "description": "学校运动会航拍案例包含开幕式中，各个方阵依次走过"
+    },
+    {
+      "source": "7989338958046234386",
+      "target": "7989338958046234386_n7",
+      "type": "父子",
+      "description": "任务3 无人机影视航拍案例包含学校宣传片航拍案例"
+    },
+    {
+      "source": "7989338958046234386_n7",
+      "target": "7989338958046234386_n8",
+      "type": "父子",
+      "description": "学校宣传片航拍案例包含拍摄校园气派的校门风光"
+    },
+    {
+      "source": "7989338958046234386_n7",
+      "target": "7989338958046234386_n9",
+      "type": "父子",
+      "description": "学校宣传片航拍案例包含模拟进入校园的体验感"
+    },
+    {
+      "source": "7989338958046234386_n7",
+      "target": "7989338958046234386_n10",
+      "type": "父子",
+      "description": "学校宣传片航拍案例包含拍摄校园建筑的雄伟外观"
+    },
+    {
+      "source": "7989338958046234386_n7",
+      "target": "7989338958046234386_n11",
+      "type": "父子",
+      "description": "学校宣传片航拍案例包含拍摄校园建筑的全貌"
+    },
+    {
+      "source": "7989338958046234386_n7",
+      "target": "7989338958046234386_n12",
+      "type": "父子",
+      "description": "学校宣传片航拍案例包含拍摄整个校园的全貌"
+    }
+  ]
+}

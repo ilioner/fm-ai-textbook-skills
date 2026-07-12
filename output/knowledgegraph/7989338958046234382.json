@@ -1,0 +1,205 @@
+{
+  "nodes": [
+    {
+      "id": "7989338958046234382",
+      "label": "任务2 无人机的调试",
+      "level": 0,
+      "dataHash": "fm-doc-id-089e9192abb8d163",
+      "displayCode": "UAS_P2T2",
+      "description": [
+        {
+          "text": "多旋翼无人机将机架、飞控系统、动力系统和通信系统等硬件组装后，为了实现无人机的良好飞行及功能要求，必须进行合理的调试，调试工作关系着飞行性能及安全。根据调试过程中是否需要安装螺旋桨，可分为无桨调试和有桨调试。",
+          "dataHash": "fm-doc-id-2af08d01690b6525"
+        }
+      ],
+      "knowledgeCategory": "元认知",
+      "cognitiveDimension": "理解"
+    },
+    {
+      "id": "7989338958046234382_n1",
+      "label": "无桨调试",
+      "level": 1,
+      "dataHash": "fm-doc-id-de4475a8ca2b30fa",
+      "description": [
+        {
+          "text": "（1）连接所有线路，接通电源，进行首次通电测试，检查飞控、电调、电机和接收机是否正常通电，检查有没有出现短路或断路现象。",
+          "dataHash": "fm-doc-id-2ea9e6c8828880fb"
+        },
+        {
+          "text": "（2）检查遥控器，进行对频及相关设置。",
+          "dataHash": "fm-doc-id-c4b409fe4165e9b5"
+        },
+        {
+          "text": "（3）将飞控连接到电脑，用调试软件（地面站）对飞控进行调试。",
+          "dataHash": "fm-doc-id-ec731b5ce8682c7c"
+        },
+        {
+          "text": "（4）接通电源，用遥控器解锁飞控，推动油门检查四个电机的转向是否正确。",
+          "dataHash": "fm-doc-id-6a3289c0909f2280"
+        }
+      ],
+      "knowledgeCategory": "程序性",
+      "cognitiveDimension": "应用",
+      "tags": "重点"
+    },
+    {
+      "id": "7989338958046234382_n2",
+      "label": "有桨调试",
+      "level": 1,
+      "dataHash": "fm-doc-id-ad5dbc3f7d548b00",
+      "description": [
+        {
+          "text": "（1）安装螺旋桨，根据电机转向正确地安装螺旋桨。",
+          "dataHash": "fm-doc-id-f807f6a93254758b"
+        },
+        {
+          "text": "（2）将飞行器放在安全防护网内试飞，或通过捆绑的方式限制飞行器。飞行器第一次试飞可能会出现各种意外情况，通过防护网或捆绑可以有效地保护人员和设备安全。",
+          "dataHash": "fm-doc-id-6f29fdbfa37b54fb"
+        },
+        {
+          "text": "",
+          "dataHash": "fm-doc-id-356caa7d0433f980"
+        }
+      ],
+      "knowledgeCategory": "程序性",
+      "cognitiveDimension": "应用",
+      "tags": "重点"
+    },
+    {
+      "id": "7989338958046234382_n3",
+      "label": "调试中常见的概念",
+      "level": 1,
+      "dataHash": "fm-doc-id-0877dd8e57a40aa0",
+      "knowledgeCategory": "概念性",
+      "cognitiveDimension": "理解"
+    },
+    {
+      "id": "7989338958046234382_n4",
+      "label": "PID",
+      "level": 2,
+      "dataHash": "fm-doc-id-53d7ff93b63735fa",
+      "description": [
+        {
+          "text": "在闭环自动控制技术领域里都是基于反馈的概念以减少不确定性，其反馈的要素包括三个部分：测量、比较和执行。测量的关键是将被控变量的实际值与期望值相比较，用偏差来纠正系统的响应，执行调节控制。在实际工程中，应用最为广泛的调节器控制规律为比例、积分、微分控制，简称PID控制，又称PID调节。其中，P代表比例，I代表积分，D代表微分。",
+          "dataHash": "fm-doc-id-1434f0bb7d52fc67"
+        },
+        {
+          "text": "不良的PID值的表现：\n（1）动态响应太快或太慢。\n（2）控制过冲或不足。\n（3）抖动、无法顺利起飞和降落、自稳能力弱、坠机等。",
+          "dataHash": "fm-doc-id-1b14fbf25ee9c2ec",
+          "sourceHashes": [
+            {
+              "text": "不良的PID值的表现：",
+              "dataHash": "fm-doc-id-1b14fbf25ee9c2ec"
+            },
+            {
+              "text": "（1）动态响应太快或太慢。",
+              "dataHash": "fm-doc-id-0582ba6ac52edad5"
+            },
+            {
+              "text": "（2）控制过冲或不足。",
+              "dataHash": "fm-doc-id-d4a5168ea21afa33"
+            },
+            {
+              "text": "（3）抖动、无法顺利起飞和降落、自稳能力弱、坠机等。",
+              "dataHash": "fm-doc-id-1faf90901788ffc9"
+            }
+          ]
+        },
+        {
+          "text": "较好的PID值的表现：\n（1）动态响应迅速、及时。\n（2）控制既不过冲也不欠缺。\n（3）无抖动、飞行平稳、自稳能力强、动作迅速有力。",
+          "dataHash": "fm-doc-id-f2b4100584ace775",
+          "sourceHashes": [
+            {
+              "text": "较好的PID值的表现：",
+              "dataHash": "fm-doc-id-f2b4100584ace775"
+            },
+            {
+              "text": "（1）动态响应迅速、及时。",
+              "dataHash": "fm-doc-id-24909b6e5f660ca7"
+            },
+            {
+              "text": "（2）控制既不过冲也不欠缺。",
+              "dataHash": "fm-doc-id-9108063978bc4f58"
+            },
+            {
+              "text": "（3）无抖动、飞行平稳、自稳能力强、动作迅速有力。",
+              "dataHash": "fm-doc-id-ed262c7a2413d765"
+            }
+          ]
+        }
+      ],
+      "knowledgeCategory": "概念性",
+      "cognitiveDimension": "理解"
+    },
+    {
+      "id": "7989338958046234382_n5",
+      "label": "传感器",
+      "level": 2,
+      "dataHash": "fm-doc-id-4a71d8b21e362014",
+      "description": [
+        {
+          "text": "常见的飞控传感器种类主要有陀螺仪、加速度计、磁罗盘、气压计、GPS以及光流模块等。",
+          "dataHash": "fm-doc-id-22178b349055d274"
+        },
+        {
+          "text": "简单来说，陀螺仪是飞行器进入自动驾驶的第一个环节，让无人机姿态反馈变为现实。",
+          "dataHash": "fm-doc-id-5622ed22a53018d6"
+        },
+        {
+          "text": "（1）陀螺仪的作用是反馈无人机的角速率状态信息。",
+          "dataHash": "fm-doc-id-bb17aac476c5fc5b"
+        },
+        {
+          "text": "（2）加速度计的作用是反馈无人机三个轴（x，y，z）上的加速度信息。气压计测量的物理量是大气压值，根据该数值可计算出绝对海拔高度。",
+          "dataHash": "fm-doc-id-d98dfb835835a0ed"
+        },
+        {
+          "text": "（3）磁罗盘测量的物理量是地球磁场强度沿机体轴的分量，并依此计算出机体的航向角。",
+          "dataHash": "fm-doc-id-28abbe0da6015544"
+        },
+        {
+          "text": "传感器需要进行校准，包括精校准和粗校准。精校准的效果比较好，但需要昂贵的标定设备；粗校准不需要借助外部设备，只对传感器本身进行操作即可。",
+          "dataHash": "fm-doc-id-65f80960e6638afe"
+        },
+        {
+          "text": "以磁罗盘的粗校准为例，由于地球上任意位置的地磁场强度在较长时间跨度内都可被视为是恒定的。当转动磁罗盘时，根据相对运动可假设磁罗盘固定不动，而地磁场矢量随之在转动，其矢量端点在空间的轨迹应为一个标准的球体，但由于传感器存在误差，实际测出的数据并不严格都在球体的表面，这时候就需要根据测量出来的数值以及已知的准确值来计算两者之间的换算关系，也就是该磁罗盘的误差模型。在以后使用该磁罗盘时就可以根据粗校准得出的误差模型来处理测量值，使得测量值的误差减小。",
+          "dataHash": "fm-doc-id-592ad31f00aad380"
+        }
+      ],
+      "knowledgeCategory": "事实性",
+      "cognitiveDimension": "理解"
+    }
+  ],
+  "edges": [
+    {
+      "source": "7989338958046234382",
+      "target": "7989338958046234382_n1",
+      "type": "父子",
+      "description": "任务2 无人机的调试包含无桨调试"
+    },
+    {
+      "source": "7989338958046234382",
+      "target": "7989338958046234382_n2",
+      "type": "父子",
+      "description": "任务2 无人机的调试包含有桨调试"
+    },
+    {
+      "source": "7989338958046234382",
+      "target": "7989338958046234382_n3",
+      "type": "父子",
+      "description": "任务2 无人机的调试包含调试中常见的概念"
+    },
+    {
+      "source": "7989338958046234382_n3",
+      "target": "7989338958046234382_n4",
+      "type": "父子",
+      "description": "调试中常见的概念包含PID"
+    },
+    {
+      "source": "7989338958046234382_n3",
+      "target": "7989338958046234382_n5",
+      "type": "父子",
+      "description": "调试中常见的概念包含传感器"
+    }
+  ]
+}

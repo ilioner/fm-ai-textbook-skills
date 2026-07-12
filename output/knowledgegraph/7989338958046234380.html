@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>知识图谱预览</title>
+<style>
+  :root {
+    --bg: #0f1420;
+    --panel: #171d2b;
+    --panel-2: #1e2637;
+    --line: #2a3548;
+    --text: #e6ebf5;
+    --muted: #8a97ad;
+    --l0: #f5a623;
+    --l1: #4a9eff;
+    --l2: #35d0a5;
+    --accent: #6c8cff;
+    --shadow: 0 6px 24px rgba(0,0,0,.35);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+  }
+  header {
+    padding: 14px 22px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    flex-shrink: 0;
+    box-shadow: var(--shadow);
+    z-index: 10;
+  }
+  header h1 { font-size: 17px; font-weight: 600; letter-spacing: .5px; }
+  header .meta { font-size: 12px; color: var(--muted); display: flex; gap: 14px; }
+  header .meta b { color: var(--text); font-weight: 500; }
+  .switcher { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .switcher select {
+    background: var(--panel-2);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 7px 12px;
+    font-size: 13px;
+    outline: none;
+    cursor: pointer;
+  }
+  .layout { flex: 1; display: flex; min-height: 0; }
+  .canvas-wrap {
+    flex: 1;
+    overflow: auto;
+    position: relative;
+    background:
+      radial-gradient(circle at 1px 1px, rgba(255,255,255,.035) 1px, transparent 0);
+    background-size: 22px 22px;
+  }
+  #canvas { position: relative; }
+  svg.edges { position: absolute; top: 0; left: 0; pointer-events: none; overflow: visible; }
+  .node {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 10px 14px;
+    border-radius: 12px;
+    background: var(--panel-2);
+    border: none;
+    cursor: pointer;
+    transition: transform .12s, box-shadow .12s;
+    max-width: 230px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.25);
+  }
+  .node:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+  .node.selected { box-shadow: 0 0 0 2px var(--accent), var(--shadow); }
+  .node .label { font-size: 14px; font-weight: 600; line-height: 1.35; }
+  .node .badges { display: flex; flex-wrap: wrap; gap: 5px; }
+  .badge {
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 20px;
+    background: rgba(255,255,255,.08);
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .badge.tag { background: rgba(245,166,35,.18); color: var(--l0); }
+  .node .label { display: flex; align-items: flex-start; gap: 7px; }
+  .node .dot {
+    flex-shrink: 0; width: 9px; height: 9px; border-radius: 50%;
+    margin-top: 4px;
+  }
+  .node[data-level="0"] .dot { background: var(--l0); }
+  .node[data-level="1"] .dot { background: var(--l1); }
+  .node[data-level="2"] .dot { background: var(--l2); }
+  .node .toggle {
+    position: absolute;
+    right: -11px; top: 50%;
+    transform: translateY(-50%);
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 13px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    z-index: 3;
+  }
+  .node .toggle:hover { color: var(--text); border-color: var(--accent); }
+  .detail {
+    width: 380px;
+    flex-shrink: 0;
+    background: var(--panel);
+    border-left: 1px solid var(--line);
+    overflow-y: auto;
+    padding: 22px;
+  }
+  .detail.empty { display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 13px; text-align: center; }
+  .detail h2 { font-size: 18px; margin-bottom: 6px; line-height: 1.4; }
+  .detail .dl { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
+  .detail .chip {
+    font-size: 11px; padding: 3px 9px; border-radius: 20px;
+    background: var(--panel-2); color: var(--muted); border: 1px solid var(--line);
+  }
+  .detail .sec-title {
+    font-size: 12px; color: var(--muted); text-transform: uppercase;
+    letter-spacing: .8px; margin: 18px 0 10px; border-bottom: 1px solid var(--line); padding-bottom: 6px;
+  }
+  .seg {
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+  }
+  .seg .txt { font-size: 13px; line-height: 1.7; color: var(--text); white-space: pre-line; }
+  .seg .hashes { margin-top: 8px; display: flex; flex-direction: column; gap: 3px; }
+  .seg .hash {
+    margin-top: 8px; font-size: 10.5px; color: var(--muted);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    word-break: break-all; display: flex; align-items: center; gap: 6px;
+  }
+  .seg .hash::before { content: "#"; color: var(--l2); font-weight: 700; }
+  .node-hash {
+    font-size: 10.5px; color: var(--muted);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    word-break: break-all; margin-bottom: 4px;
+  }
+  .empty-hint { color: var(--muted); font-size: 12.5px; font-style: italic; }
+  .proj-tag {
+    display: inline-block; font-size: 12px; color: var(--l0);
+    background: rgba(245,166,35,.12); border: 1px solid rgba(245,166,35,.3);
+    padding: 4px 10px; border-radius: 8px; margin-bottom: 10px;
+  }
+  /* 批注编辑区（节点详情面板内） */
+  .cmt-box { margin-top: 6px; }
+  .cmt-box textarea {
+    width: 100%; min-height: 62px; resize: vertical;
+    background: var(--bg); color: var(--text);
+    border: 1px solid var(--line); border-radius: 8px;
+    padding: 9px 11px; font-size: 13px; line-height: 1.6; outline: none;
+    font-family: inherit;
+  }
+  .cmt-box textarea:focus { border-color: var(--accent); }
+  .cmt-actions { display: flex; gap: 8px; margin-top: 8px; align-items: center; }
+  .btn {
+    font-size: 12.5px; padding: 6px 13px; border-radius: 8px; cursor: pointer;
+    border: 1px solid var(--line); background: var(--panel-2); color: var(--text);
+    transition: all .12s;
+  }
+  .btn:hover { border-color: var(--accent); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.ghost { background: transparent; color: var(--muted); }
+  .cmt-saved { font-size: 11.5px; color: var(--l2); }
+  /* 有意见的节点右上角标记 */
+  .node .cmt-flag {
+    position: absolute; left: -7px; top: -7px;
+    width: 18px; height: 18px; border-radius: 50%;
+    background: var(--l0); color: #1a1200; font-size: 11px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 2px 6px rgba(0,0,0,.4); z-index: 4;
+  }
+  /* 底部反馈栏 */
+  .feedback-bar {
+    position: fixed; left: 0; right: 380px; bottom: 0;
+    background: var(--panel); border-top: 1px solid var(--line);
+    padding: 10px 22px; display: flex; align-items: center; gap: 14px;
+    box-shadow: 0 -4px 20px rgba(0,0,0,.3); z-index: 20;
+  }
+  .feedback-bar .fb-page {
+    flex: 1; background: var(--bg); color: var(--text);
+    border: 1px solid var(--line); border-radius: 8px;
+    padding: 8px 12px; font-size: 13px; outline: none; font-family: inherit;
+  }
+  .feedback-bar .fb-page:focus { border-color: var(--accent); }
+  .feedback-bar .fb-count { font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .feedback-bar .fb-count b { color: var(--l0); }
+  .canvas-wrap { padding-bottom: 56px; }
+  .toast {
+    position: fixed; bottom: 70px; left: 50%; transform: translateX(-50%);
+    background: var(--l2); color: #04231a; padding: 10px 20px; border-radius: 10px;
+    font-size: 13px; font-weight: 600; opacity: 0; transition: opacity .25s;
+    pointer-events: none; z-index: 50; box-shadow: var(--shadow);
+  }
+  .toast.show { opacity: 1; }
+  .legend { display: flex; gap: 16px; font-size: 11.5px; color: var(--muted); align-items: center; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>📚 知识图谱预览</h1>
+  <div class="meta" id="meta"></div>
+  <div class="legend">
+    <span><i style="background:var(--l0)"></i>层级0 主题</span>
+    <span><i style="background:var(--l1)"></i>层级1 分类</span>
+    <span><i style="background:var(--l2)"></i>层级2 知识点</span>
+  </div>
+  <div class="switcher" id="switcher" style="display:none">
+    <label style="font-size:12px;color:var(--muted)">选择课程</label>
+    <select id="lessonSelect"></select>
+  </div>
+</header>
+<div class="layout">
+  <div class="canvas-wrap">
+    <div id="canvas">
+      <svg class="edges" id="edges"></svg>
+    </div>
+  </div>
+  <div class="detail empty" id="detail">点击左侧任意节点查看详细内容</div>
+</div>
+
+<div class="feedback-bar">
+  <input class="fb-page" id="pageComment" type="text"
+         placeholder="对本课程的整体修改意见（页面级）…如：空域知识下 6 个子节点顺序需调整" />
+  <span class="fb-count" id="fbCount">未添加意见</span>
+  <button class="btn ghost" id="clearBtn">清空</button>
+  <button class="btn primary" id="copyBtn">📋 复制修改意见</button>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+// 数据由 render.py 注入：数组，每项 { lessonId, meta:{textbookId,unitId,lessonId}, graph:{nodes,edges} }
+const DATASETS = [{"lessonId": "7989338958046234380", "meta": {"lessonId": "7989338958046234380"}, "graph": {"nodes": [{"id": "7989338958046234380", "label": "任务3 无人机气象知识", "level": 0, "dataHash": "fm-doc-id-e01626a10678ab5c", "displayCode": "UAS_P1T3", "description": [{"text": "大气飞行环境主要指飞行器在大气层内飞行时所处的环境条件。包围地球的空气层（即大气）是航空器的唯一飞行活动环境，也是导弹和航天器的重要飞行环境。", "dataHash": "fm-doc-id-9fa8afa8dbda04fc"}], "knowledgeCategory": "元认知", "cognitiveDimension": "理解"}, {"id": "7989338958046234380_n1", "label": "大气的基本要素", "level": 1, "dataHash": "fm-doc-id-496f7ad248d8d2f3", "description": [{"text": "表示大气状态的物理量和物理现象通称为气象要素。气温、气压、空气湿度等物理量是气象要素，风、云、降水等现象也是气象要素，它们都能在一定程度上反映当时的大气状况。其中，气温、气压和空气湿度被称为三大气象要素。", "dataHash": "fm-doc-id-2ae8532143e37938"}], "knowledgeCategory": "概念性", "cognitiveDimension": "理解", "tags": "重点"}, {"id": "7989338958046234380_n2", "label": "气温", "level": 2, "dataHash": "fm-doc-id-b39a8457c2954fa4", "description": [{"text": "气温是表示空气冷热程度的物理量，它实质上是空气分子的平均动能大小的宏观表现。一般情况下，可将空气视为理想气体，这样空气分子的平均动能就是空气内能，因此气温的升高或降低，也就是空气内能的增加或减少。在实际大气中，气温变化的基本方式有非绝热变化和绝热变化两种。对某一地点的气温（又称局地气温）来说，其变化除了与该地点的气块温度的绝热变化和非绝热变化有关外，还与不同气块温度的移动有关。", "dataHash": "fm-doc-id-51268ae2210333bd"}], "knowledgeCategory": "概念性", "cognitiveDimension": "理解"}, {"id": "7989338958046234380_n3", "label": "气压", "level": 2, "dataHash": "fm-doc-id-c495bdb95492b11f", "description": [{"text": "气压即大气压力，是指与大气相接触的面上，空气分子作用在单位面积上的力。这个力是由空气分子对接触面的碰撞引起的，也是空气分子运动所产生的压力。气压的单位是帕（Pa）。在气象学中，人们一般用百帕（hPa），其换算关系有1hPa=100N/m2。", "dataHash": "fm-doc-id-a064ea47c0d275cc"}, {"text": "气压随高度的变化而变化。当大气处于静止状态时，某一高度上的气压值等于其单位水平面积上所承受的上部大气柱的重力。随着高度增加，其上部大气柱越来越短，气柱中空气密度越来越小，气柱重力也就越来越小。", "dataHash": "fm-doc-id-8bc8c8863d58ddeb"}, {"text": "航空领域常用的气压包括以下几类。", "dataHash": "fm-doc-id-d38913851c66c5d8"}, {"text": "本站气压：指气象台气压表直接测得的气压。由于各测站所处的地理位置及海拔不同，本站气压常有较大差异。", "dataHash": "fm-doc-id-727800783d6bd148"}, {"text": "修正海平面气压：指由本站气压推算到同一地点海平面高度上的气压值。运用修正海平面气压便于分析和研究气压的水平分布情况。海拔高于1500m的测站不推算修正海平面气压，因为推算出的修正海平面气压的误差可能过大，失去意义。", "dataHash": "fm-doc-id-a73e0b1e54036e98"}, {"text": "场面气压：指着陆区（跑道入口端）最高点的气压。场面气压也是由本站气压推算出来的。飞机起降时，为了准确掌握其相对跑道的高度，就需要知道场面气压。场面气压也可由机场标高点处的气压代替。", "dataHash": "fm-doc-id-ef0984b9fe5f7f2b"}, {"text": "标准海平面气压：大气处于标准状态下的海平面气压被称为标准海平面气压，其值为1013.25hPa。海平面气压是经常变化的，而标准海平面气压是一个常数。", "dataHash": "fm-doc-id-6fcf888d0c431619"}, {"text": "飞机飞行时，测量其飞行高度多采用无线电高度表和气压式高度表。无线电高度表所测量的是飞机相对于所飞越地区地表的垂直距离。无线电高度表能不断地指示飞机相对于所飞越地表的高度，并对地形的任何变化都很“敏感”。", "dataHash": "fm-doc-id-f262a7bafd6d7532"}, {"text": "气压式高度表是主要的航行仪表，它是一个高度灵敏的空盒气压表，但刻度盘上标出的是高度。另外，有一个辅助刻度盘可显示气压，高度和气压都可通过旋钮调定。气压式高度表的刻度盘是在标准大气条件下按气压随高度的变化规律而确定的，即气压式高度表所测量的是气压，根据标准大气中气压与高度的关系，就可以表示高度。", "dataHash": "fm-doc-id-cfec774785f091f9"}, {"text": "飞行中常用的气压高度有以下几种。", "dataHash": "fm-doc-id-fe7e9f4b362c1cf2"}, {"text": "场面气压高度：它是指飞机相对于起飞或着陆机场跑道的高度。为使气压式高度表指示场面气压高度，飞行员需按场面气压来拨正气压式高度表，将气压式高度表的气压刻度拨正到场面气压值上。", "dataHash": "fm-doc-id-37fc567e0952bf42"}, {"text": "面高度：它是指相对于标准海平面的高度。飞机在航线上飞行时，都要按标准海平面气压调整高度表，其目的是使所有在航线上飞行的飞机都有相同的“零点”高度，并按此保持规定的航线仪表高度飞行，以避免飞机在空中相撞。", "dataHash": "fm-doc-id-55c8d15f7edfaf6f"}, {"text": "修正海平面气压高度：如果按修正海平面气压拨正气压式高度表，则高度表将显示修正海平面气压高度。在飞机着陆时，将高度表指示高度减去机场标高就等于飞机距机场跑道面的高度。", "dataHash": "fm-doc-id-59339a7b14f66019"}], "knowledgeCategory": "概念性", "cognitiveDimension": "理解"}, {"id": "7989338958046234380_n4", "label": "空气湿度", "level": 2, "dataHash": "fm-doc-id-bceaffbed0642489", "description": [{"text": "大气中含有水蒸气，大气中的水蒸气含量是随时间、地点、高度、天气条件而不断变化的。空气湿度就是用来量度空气中的水蒸气含量或者空气潮湿程度的物理量。", "dataHash": "fm-doc-id-f123e2741b84fdb6"}], "knowledgeCategory": "概念性", "cognitiveDimension": "理解"}, {"id": "7989338958046234380_n5", "label": "大气层的划分", "level": 1, "dataHash": "fm-doc-id-d779c96fd462dd48", "description": [{"text": "大气层无明显的上限，它的各种特性在垂直方向上的差异非常明显，如空气随高度增加而趋于稀薄。以大气中温度随高度的分布为主要依据，可将大气层划分为对流层、平流层、中间层、热层和散逸层，如图1.3.1所示。航空器的大气飞行环境是对流层和平流层。大气层对飞行有很大的影响，恶劣的天气条件会危及飞行安全。大气属性（温度、压力、湿度、风向、风速等）对飞机的飞行性能和飞行航迹也会产生不同程度的影响。", "dataHash": "fm-doc-id-79b29f575f203e05"}], "knowledgeCategory": "事实性", "cognitiveDimension": "理解", "tags": "重点"}, {"id": "7989338958046234380_n6", "label": "对流层", "level": 2, "dataHash": "fm-doc-id-9a993e6a03ca7e0a", "description": [{"text": "对流层下层，又称摩擦层，它的范围自地面到1km～2km的高度，但在各地的实际高度又与地表性质、季节等因素有关。一般说来，其高度在粗糙地表上高于平整地表上，夏季高于冬季（北半球），昼间高于夜间。在对流层下层，气流受地面摩擦作用影响很大，风速通常随高度增加而增大。在复杂的地形和恶劣的天气条件下，常存在剧烈的气流扰动，威胁着飞行安全，突发的下冲气流和强烈的低空风切变常会引发飞机事故。另外，充沛的水蒸气和尘埃往往导致浓雾及其他恶化能见度的现象，对飞机的起飞和着陆构成严重的障碍。为了确保飞行安全，每个机场都规定有各类飞机的起降气象条件。另外，对流层下层中气温的日变化极为明显，昼夜温差可达10℃～40℃。", "dataHash": "fm-doc-id-f514aa6065dcffff"}, {"text": "对流层中层的底界即对流层下层顶，上界高度约为6 km，这一层受地表的影响远小于对流层下层。大气中的云和降水现象大都发生在这一层内。对流层中层的上部的气压通常只有地面的一半，在那里飞行时需要使用氧气。一般轻型运输机、直升机等常在这一层中飞行（图1.3.2）。", "dataHash": "fm-doc-id-7fc2d8a2e0d242a5"}, {"text": "上层范围从6km高度伸展到对流层的顶部，这一层的气温常年都在0℃以下，水蒸气含量很少，各种云都由冰晶或过冷却水滴组成。在中纬度和副热带地区，这一层中常有风速等于或大于30m/s的强风带，即所谓高空急流。飞机在高空急流附近飞行时往往会发生强烈颠簸，使乘客感觉不适，甚至被破坏结构和造成安全威胁。", "dataHash": "fm-doc-id-3f00889381ed3624"}, {"text": "在对流层和平流层之间，还有一个厚度为数百米到2km的过渡层，被称为对流层顶。对流层顶对垂直气流有很大的阻挡作用。上升的水蒸气、尘粒等多聚集其下，那里的能见度往往较低。", "dataHash": "fm-doc-id-e0c6984f10542a80"}], "knowledgeCategory": "事实性", "cognitiveDimension": "记忆"}, {"id": "7989338958046234380_n7", "label": "平流层", "level": 2, "dataHash": "fm-doc-id-5df0e8c753a38443", "description": [{"text": "平流层位于对流层之上，位于50km～55km高度处。在平流层内，随着高度的增加，气温最初保持不变或微有上升，到30km高度以上气温升高较快，到了平流层顶气温升至270K～290K。平流层的这种气温分布特征同它受地面影响小和存在大量臭氧（臭氧能直接吸收太阳辐射）有关。平流层过去常被称为同温层，实际上指的是平流层的下部。在平流层中，空气的垂直运动远比对流层弱，水蒸气、尘粒含量也较少，因而气流比较平缓，能见度较高。对于飞行来说，平流层气流平稳、空气阻力小是有利的一面（图1.3.3），但因平流层空气稀薄，飞行器的稳定性和操纵性变差，这又是不利的一面。高性能的现代歼击机和侦察机都能在平流层中飞行（图1.3.4）。随着飞机飞行高度上限的日益增加，火箭、导弹等技术的发展，对平流层的研究日趋重要。", "dataHash": "fm-doc-id-6af29cf7c6d7b935"}, {"text": "1/2", "dataHash": "fm-doc-id-7660fd17e372cf49"}, {"text": "2/2", "dataHash": "fm-doc-id-cab23966b856bdee"}], "knowledgeCategory": "事实性", "cognitiveDimension": "记忆"}, {"id": "7989338958046234380_n8", "label": "中间层", "level": 2, "dataHash": "fm-doc-id-c9d1ea1a5ba6d646", "description": [{"text": "中间层从平流层顶伸展到80km～85km高度。这一层的特点是气温随高度增加而降低，空气有相当强烈的垂直运动。在这一层的顶部，气温可低至160K～190K。", "dataHash": "fm-doc-id-dccedb5272317ede"}], "knowledgeCategory": "事实性", "cognitiveDimension": "记忆"}, {"id": "7989338958046234380_n9", "label": "热层", "level": 2, "dataHash": "fm-doc-id-48f56d40752c8a43", "description": [{"text": "热层又称为暖层或电离层，范围从中间层顶伸展到约800 km高度。这一层的空气密度很小，声波也难以传播。热层的一个特征是气温随高度增加而上升，另一个特征是空气处于高度电离状态。热层的变化会影响飞行器的无线电通信（图1.3.5、图1.3.6）。", "dataHash": "fm-doc-id-fe7c482763ec0b35"}, {"text": "1/2", "dataHash": "fm-doc-id-7660fd17e372cf49"}, {"text": "2/2", "dataHash": "fm-doc-id-cab23966b856bdee"}], "knowledgeCategory": "事实性", "cognitiveDimension": "记忆"}, {"id": "7989338958046234380_n10", "label": "散逸层", "level": 2, "dataHash": "fm-doc-id-9f08e06a48769cb0", "description": [{"text": "散逸层又称逃逸层、外大气层，是地球大气的最外层，位于热层之上。散逸层的空气极其稀薄，同时又远离地面，受地球的引力作用较小，因而大气分子不断地向星际空间逃逸。航天器脱离这一层后便进入太空飞行。", "dataHash": "fm-doc-id-ee8aaa7c5ebc4bb1"}], "knowledgeCategory": "事实性", "cognitiveDimension": "记忆"}], "edges": [{"source": "7989338958046234380", "target": "7989338958046234380_n1", "type": "父子", "description": "任务3 无人机气象知识包含大气的基本要素"}, {"source": "7989338958046234380_n1", "target": "7989338958046234380_n2", "type": "父子", "description": "大气的基本要素包含气温"}, {"source": "7989338958046234380_n1", "target": "7989338958046234380_n3", "type": "父子", "description": "大气的基本要素包含气压"}, {"source": "7989338958046234380_n1", "target": "7989338958046234380_n4", "type": "父子", "description": "大气的基本要素包含空气湿度"}, {"source": "7989338958046234380", "target": "7989338958046234380_n5", "type": "父子", "description": "任务3 无人机气象知识包含大气层的划分"}, {"source": "7989338958046234380_n5", "target": "7989338958046234380_n6", "type": "父子", "description": "大气层的划分包含对流层"}, {"source": "7989338958046234380_n5", "target": "7989338958046234380_n7", "type": "父子", "description": "大气层的划分包含平流层"}, {"source": "7989338958046234380_n5", "target": "7989338958046234380_n8", "type": "父子", "description": "大气层的划分包含中间层"}, {"source": "7989338958046234380_n5", "target": "7989338958046234380_n9", "type": "父子", "description": "大气层的划分包含热层"}, {"source": "7989338958046234380_n5", "target": "7989338958046234380_n10", "type": "父子", "description": "大气层的划分包含散逸层"}]}}];
+
+const COL_W = 300;      // 层级横向间距
+const NODE_H = 62;      // 单节点占位高度
+const V_GAP = 16;       // 兄弟节点垂直间距
+const canvas = document.getElementById('canvas');
+const edgesSvg = document.getElementById('edges');
+const detail = document.getElementById('detail');
+const metaEl = document.getElementById('meta');
+
+let current = null;      // 当前数据集
+let nodeMap = {};        // id -> node
+let childrenMap = {};    // id -> [childId]
+let elMap = {};          // id -> DOM 元素（用于读取真实坐标画线）
+let collapsed = new Set();
+let selectedId = null;
+
+// 批注存储：按 lessonId 分组。{ [lessonId]: { nodes: {nodeId:{label,level,text}}, page: "" } }
+// 存在内存中（纯静态页，无需后端）。切换 lesson 不丢，复制时汇总所有有意见的 lesson。
+const feedback = {};
+function fbFor(lessonId) {
+  if (!feedback[lessonId]) feedback[lessonId] = { nodes: {}, page: "" };
+  return feedback[lessonId];
+}
+
+function buildTree(graph) {
+  nodeMap = {};
+  childrenMap = {};
+  graph.nodes.forEach(n => { nodeMap[n.id] = n; childrenMap[n.id] = []; });
+  graph.edges.forEach(e => {
+    if (childrenMap[e.source]) childrenMap[e.source].push(e.target);
+  });
+  // 根 = level 0，或无入边的节点
+  const hasParent = new Set(graph.edges.map(e => e.target));
+  return graph.nodes.filter(n => n.level === 0 || !hasParent.has(n.id)).map(n => n.id);
+}
+
+// 递归布局：用节点真实高度 node._h 计算占位，返回子树总高度，写入 node._x/_y。
+// node._y 为该节点顶端 y 坐标；节点垂直居中对齐其子树跨度。
+function layout(id, depth, cursorY) {
+  const node = nodeMap[id];
+  node._x = depth * COL_W;
+  const selfH = (node._h || NODE_H) + V_GAP;
+  const kids = collapsed.has(id) ? [] : childrenMap[id];
+  if (kids.length === 0) {
+    node._y = cursorY;
+    return selfH;
+  }
+  let y = cursorY;
+  let total = 0;
+  kids.forEach(k => {
+    const h = layout(k, depth + 1, y);
+    y += h; total += h;
+  });
+  // 父节点中心对齐首末子节点中心
+  const first = nodeMap[kids[0]];
+  const last = nodeMap[kids[kids.length - 1]];
+  const kidsMid = (first._y + (first._h || NODE_H) / 2 + last._y + (last._h || NODE_H) / 2) / 2;
+  node._y = kidsMid - (node._h || NODE_H) / 2;
+  // 子树可能比父节点自身矮，取较大者
+  return Math.max(total, selfH);
+}
+
+function render() {
+  // 清空旧节点（保留 svg）
+  [...canvas.querySelectorAll('.node')].forEach(n => n.remove());
+  elMap = {};
+  const roots = buildTree(current.graph);
+
+  // —— 阶段一：建节点并入 DOM（先不定位），测量真实高度 ——
+  Object.values(nodeMap).forEach(n => {
+    const el = document.createElement('div');
+    el.className = 'node' + (n.id === selectedId ? ' selected' : '');
+    el.dataset.level = n.level;
+    el.style.visibility = 'hidden';
+
+    const badges = [];
+    if (n.tags) badges.push(`<span class="badge tag">${n.tags}</span>`);
+    if (n.knowledgeCategory) badges.push(`<span class="badge">${n.knowledgeCategory}</span>`);
+    if (n.cognitiveDimension) badges.push(`<span class="badge">${n.cognitiveDimension}</span>`);
+
+    el.innerHTML = `<div class="label"><span class="dot"></span><span>${escapeHtml(n.label)}</span></div>` +
+                   (badges.length ? `<div class="badges">${badges.join('')}</div>` : '');
+
+    const kids = childrenMap[n.id];
+    if (kids && kids.length) {
+      const t = document.createElement('div');
+      t.className = 'toggle';
+      t.textContent = collapsed.has(n.id) ? '+' : '−';
+      t.onclick = (ev) => { ev.stopPropagation(); toggle(n.id); };
+      el.appendChild(t);
+    }
+    // 有意见的节点加标记
+    if (current && fbFor(current.lessonId).nodes[n.id]) {
+      const flag = document.createElement('div');
+      flag.className = 'cmt-flag';
+      flag.textContent = '✎';
+      flag.title = '该节点有修改意见';
+      el.appendChild(flag);
+    }
+    el.onclick = () => select(n.id);
+    canvas.appendChild(el);
+    elMap[n.id] = el;
+  });
+  // 测量真实高度/宽度写入 node._h / node._w
+  Object.values(nodeMap).forEach(n => {
+    n._h = elMap[n.id].offsetHeight;
+    n._w = elMap[n.id].offsetWidth;
+  });
+
+  // —— 阶段二：按真实高度布局 ——
+  let cursorY = 0;
+  roots.forEach(r => { cursorY += layout(r, 0, cursorY); });
+
+  // —— 阶段三：算内容包围盒 ——
+  let contentW = 0, contentH = 0;
+  Object.values(nodeMap).forEach(n => {
+    if (n._x === undefined) return;
+    contentW = Math.max(contentW, n._x + (n._w || 200));
+    contentH = Math.max(contentH, n._y + (n._h || NODE_H));
+  });
+
+  // 居中偏移：内容比视口小时居中，否则留固定边距
+  const wrap = canvas.parentElement;      // .canvas-wrap 视口
+  const PAD = 48;
+  const vw = wrap.clientWidth, vh = wrap.clientHeight;
+  const offsetX = Math.max(PAD, (vw - contentW) / 2);
+  const offsetY = Math.max(PAD, (vh - contentH) / 2);
+
+  // —— 阶段四：定位并显示 ——
+  Object.values(nodeMap).forEach(n => {
+    if (n._x === undefined) return;
+    const el = elMap[n.id];
+    el.style.left = (n._x + offsetX) + 'px';
+    el.style.top = (n._y + offsetY) + 'px';
+    el.style.visibility = 'visible';
+  });
+
+  // canvas 至少填满视口，内容超出时按内容+边距撑开
+  canvas.style.width = Math.max(vw, contentW + offsetX + PAD) + 'px';
+  canvas.style.height = Math.max(vh, contentH + offsetY + PAD) + 'px';
+  // 节点已定位，用真实坐标画线（消除偏移）
+  drawEdges();
+}
+
+function drawEdges() {
+  edgesSvg.innerHTML = '';
+  edgesSvg.setAttribute('width', canvas.style.width);
+  edgesSvg.setAttribute('height', canvas.style.height);
+  current.graph.edges.forEach(e => {
+    if (collapsed.has(e.source)) return;
+    const se = elMap[e.source], te = elMap[e.target];
+    if (!se || !te) return;
+    // 读取真实布局坐标：起点=父节点右边缘中点，终点=子节点左边缘中点
+    const x1 = se.offsetLeft + se.offsetWidth;
+    const y1 = se.offsetTop + se.offsetHeight / 2;
+    const x2 = te.offsetLeft;
+    const y2 = te.offsetTop + te.offsetHeight / 2;
+    const mx = (x1 + x2) / 2;
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`);
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', '#3a4761');
+    path.setAttribute('stroke-width', '1.6');
+    edgesSvg.appendChild(path);
+  });
+}
+
+function toggle(id) {
+  if (collapsed.has(id)) collapsed.delete(id); else collapsed.add(id);
+  render();
+}
+
+function select(id) {
+  selectedId = id;
+  render();
+  const n = nodeMap[id];
+  const chips = [];
+  chips.push(`<span class="chip">层级 ${n.level}</span>`);
+  if (n.knowledgeCategory) chips.push(`<span class="chip">${n.knowledgeCategory}</span>`);
+  if (n.cognitiveDimension) chips.push(`<span class="chip">${n.cognitiveDimension}</span>`);
+  if (n.tags) chips.push(`<span class="chip" style="color:var(--l0)">${n.tags}</span>`);
+
+  let html = '';
+  if (n.projectTitle) {
+    html += `<div class="proj-tag">📁 ${escapeHtml(n.projectTitle)}</div>`;
+  }
+  html += `<h2>${escapeHtml(n.label)}</h2>`;
+  if (n.dataHash) html += `<div class="node-hash"># ${n.dataHash}</div>`;
+  if (n.projectDataHash) html += `<div class="node-hash">项目 # ${n.projectDataHash}</div>`;
+  html += `<div class="dl">${chips.join('')}</div>`;
+
+  const desc = n.description || [];
+  if (desc.length) {
+    html += `<div class="sec-title">详细说明（${desc.length} 段）</div>`;
+    desc.forEach(d => {
+      html += `<div class="seg"><div class="txt">${escapeHtml(d.text)}</div>`;
+      if (d.sourceHashes && d.sourceHashes.length) {
+        // 合并段：列出全部源 hash（零丢失可追溯）
+        html += `<div class="hashes">` +
+          d.sourceHashes.map(s => `<div class="hash">${s.dataHash}</div>`).join('') +
+          `</div>`;
+      } else if (d.dataHash) {
+        html += `<div class="hash">${d.dataHash}</div>`;
+      }
+      html += `</div>`;
+    });
+  } else {
+    html += `<div class="sec-title">详细说明</div><div class="empty-hint">该节点为分类/主题节点，无独立正文说明。</div>`;
+  }
+
+  // 节点级批注编辑区
+  const existing = fbFor(current.lessonId).nodes[id];
+  html += `<div class="sec-title">修改意见（该节点）</div>` +
+    `<div class="cmt-box">` +
+    `<textarea id="nodeCmt" placeholder="写下对「${escapeHtml(n.label)}」的修改意见，例如：该节点应为 level 1 / 应删除 / 归类错误…">${existing ? escapeHtml(existing.text) : ''}</textarea>` +
+    `<div class="cmt-actions">` +
+    `<button class="btn primary" id="saveCmtBtn">保存意见</button>` +
+    (existing ? `<button class="btn ghost" id="delCmtBtn">删除</button><span class="cmt-saved">✓ 已记录</span>` : '') +
+    `</div></div>`;
+
+  detail.className = 'detail';
+  detail.innerHTML = html;
+
+  document.getElementById('saveCmtBtn').onclick = () => {
+    const txt = document.getElementById('nodeCmt').value.trim();
+    const store = fbFor(current.lessonId).nodes;
+    if (txt) {
+      store[id] = { label: n.label, level: n.level, text: txt };
+    } else {
+      delete store[id];
+    }
+    updateFbCount(); render(); select(id);
+    showToast(txt ? '已记录该节点意见' : '已清除该节点意见');
+  };
+  const delBtn = document.getElementById('delCmtBtn');
+  if (delBtn) delBtn.onclick = () => {
+    delete fbFor(current.lessonId).nodes[id];
+    updateFbCount(); render(); select(id);
+    showToast('已删除该节点意见');
+  };
+}
+
+function escapeHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// —— 反馈：计数、生成文本、复制 ——
+function countFeedback() {
+  let n = 0;
+  Object.values(feedback).forEach(f => {
+    n += Object.keys(f.nodes).length;
+    if (f.page && f.page.trim()) n += 1;
+  });
+  return n;
+}
+
+function updateFbCount() {
+  const c = countFeedback();
+  const el = document.getElementById('fbCount');
+  el.innerHTML = c ? `已添加 <b>${c}</b> 条意见` : '未添加意见';
+}
+
+function buildFeedbackText() {
+  // 汇总所有有意见的 lesson；只带定位信息 + 意见（正文由大模型自行读 json 定位）
+  const lines = ['# 知识图谱修改意见', ''];
+  let any = false;
+  Object.keys(feedback).forEach(lessonId => {
+    const f = feedback[lessonId];
+    const nodeIds = Object.keys(f.nodes);
+    const hasPage = f.page && f.page.trim();
+    if (!nodeIds.length && !hasPage) return;
+    any = true;
+    lines.push(`## 课程 lessonId: ${lessonId}`);
+    lines.push(`对应文件: output/knowledgegraph/${lessonId}.json`);
+    lines.push('');
+    if (nodeIds.length) {
+      lines.push('### 节点级意见');
+      nodeIds.forEach(nid => {
+        const c = f.nodes[nid];
+        lines.push(`- [节点 ${nid}]「${c.label}」(level ${c.level})`);
+        lines.push(`  意见: ${c.text}`);
+      });
+      lines.push('');
+    }
+    if (hasPage) {
+      lines.push('### 页面级意见');
+      lines.push(`- ${f.page.trim()}`);
+      lines.push('');
+    }
+  });
+  if (!any) return '';
+  lines.push('---');
+  lines.push('请据以上意见对相应 lesson 的 json 二次修改，改后用 validate.py 校验、render.py 重新渲染。');
+  return lines.join('\n');
+}
+
+function copyFeedback() {
+  const text = buildFeedbackText();
+  if (!text) { showToast('尚未添加任何修改意见'); return; }
+  const done = () => showToast('修改意见已复制，粘贴给大模型即可');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+  } else {
+    fallbackCopy(text, done);
+  }
+}
+
+function fallbackCopy(text, done) {
+  const ta = document.createElement('textarea');
+  ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); done(); }
+  catch (e) { showToast('复制失败，请手动选择'); }
+  document.body.removeChild(ta);
+}
+
+let toastTimer = null;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+function loadDataset(idx) {
+  current = DATASETS[idx];
+  collapsed = new Set();
+  selectedId = null;
+  detail.className = 'detail empty';
+  detail.textContent = '点击左侧任意节点查看详细内容';
+  const m = current.meta || {};
+  const rootNode = current.graph.nodes.find(n => n.level === 0) || {};
+  const dc = rootNode.displayCode;
+  metaEl.innerHTML =
+    (dc ? `<span>代码 <b>${escapeHtml(dc)}</b></span>` : '') +
+    `<span>课程 <b>${current.lessonId}</b></span>` +
+    (m.unitId ? `<span>单元 <b>${m.unitId}</b></span>` : '') +
+    (m.textbookId ? `<span>教材 <b>${m.textbookId}</b></span>` : '') +
+    `<span>节点 <b>${current.graph.nodes.length}</b></span>`;
+  // 同步当前课程的页面级意见到输入框
+  const pc = document.getElementById('pageComment');
+  if (pc) pc.value = fbFor(current.lessonId).page || '';
+  render();
+}
+
+// 初始化
+(function init() {
+  const sel = document.getElementById('lessonSelect');
+  if (DATASETS.length > 1) {
+    document.getElementById('switcher').style.display = 'flex';
+    DATASETS.forEach((d, i) => {
+      const o = document.createElement('option');
+      o.value = i;
+      const rootLabel = (d.graph.nodes.find(n => n.level === 0) || {}).label || d.lessonId;
+      o.textContent = `${d.lessonId} · ${rootLabel}`;
+      sel.appendChild(o);
+    });
+    sel.onchange = () => loadDataset(+sel.value);
+  }
+
+  // 页面级意见：实时写入当前课程
+  const pc = document.getElementById('pageComment');
+  pc.addEventListener('input', () => {
+    fbFor(current.lessonId).page = pc.value;
+    updateFbCount();
+  });
+  // 复制 / 清空
+  document.getElementById('copyBtn').onclick = copyFeedback;
+  document.getElementById('clearBtn').onclick = () => {
+    const c = countFeedback();
+    if (!c) { showToast('当前没有意见可清空'); return; }
+    if (!confirm(`确定清空全部 ${c} 条修改意见？`)) return;
+    Object.keys(feedback).forEach(k => delete feedback[k]);
+    pc.value = '';
+    updateFbCount(); render();
+    if (selectedId) select(selectedId);
+    showToast('已清空全部意见');
+  };
+
+  // 窗口尺寸变化时重新布局居中（防抖）
+  let rzTimer = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(rzTimer);
+    rzTimer = setTimeout(() => { if (current) render(); }, 150);
+  });
+
+  loadDataset(0);
+  updateFbCount();
+})();
+</script>
+</body>
+</html>

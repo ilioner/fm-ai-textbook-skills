@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>知识图谱预览</title>
+<style>
+  :root {
+    --bg: #0f1420;
+    --panel: #171d2b;
+    --panel-2: #1e2637;
+    --line: #2a3548;
+    --text: #e6ebf5;
+    --muted: #8a97ad;
+    --l0: #f5a623;
+    --l1: #4a9eff;
+    --l2: #35d0a5;
+    --accent: #6c8cff;
+    --shadow: 0 6px 24px rgba(0,0,0,.35);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+  }
+  header {
+    padding: 14px 22px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    flex-shrink: 0;
+    box-shadow: var(--shadow);
+    z-index: 10;
+  }
+  header h1 { font-size: 17px; font-weight: 600; letter-spacing: .5px; }
+  header .meta { font-size: 12px; color: var(--muted); display: flex; gap: 14px; }
+  header .meta b { color: var(--text); font-weight: 500; }
+  .switcher { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .switcher select {
+    background: var(--panel-2);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 7px 12px;
+    font-size: 13px;
+    outline: none;
+    cursor: pointer;
+  }
+  .layout { flex: 1; display: flex; min-height: 0; }
+  .canvas-wrap {
+    flex: 1;
+    overflow: auto;
+    position: relative;
+    background:
+      radial-gradient(circle at 1px 1px, rgba(255,255,255,.035) 1px, transparent 0);
+    background-size: 22px 22px;
+  }
+  #canvas { position: relative; }
+  svg.edges { position: absolute; top: 0; left: 0; pointer-events: none; overflow: visible; }
+  .node {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 10px 14px;
+    border-radius: 12px;
+    background: var(--panel-2);
+    border: none;
+    cursor: pointer;
+    transition: transform .12s, box-shadow .12s;
+    max-width: 230px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.25);
+  }
+  .node:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+  .node.selected { box-shadow: 0 0 0 2px var(--accent), var(--shadow); }
+  .node .label { font-size: 14px; font-weight: 600; line-height: 1.35; }
+  .node .badges { display: flex; flex-wrap: wrap; gap: 5px; }
+  .badge {
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 20px;
+    background: rgba(255,255,255,.08);
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .badge.tag { background: rgba(245,166,35,.18); color: var(--l0); }
+  .node .label { display: flex; align-items: flex-start; gap: 7px; }
+  .node .dot {
+    flex-shrink: 0; width: 9px; height: 9px; border-radius: 50%;
+    margin-top: 4px;
+  }
+  .node[data-level="0"] .dot { background: var(--l0); }
+  .node[data-level="1"] .dot { background: var(--l1); }
+  .node[data-level="2"] .dot { background: var(--l2); }
+  .node .toggle {
+    position: absolute;
+    right: -11px; top: 50%;
+    transform: translateY(-50%);
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 13px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    z-index: 3;
+  }
+  .node .toggle:hover { color: var(--text); border-color: var(--accent); }
+  .detail {
+    width: 380px;
+    flex-shrink: 0;
+    background: var(--panel);
+    border-left: 1px solid var(--line);
+    overflow-y: auto;
+    padding: 22px;
+  }
+  .detail.empty { display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 13px; text-align: center; }
+  .detail h2 { font-size: 18px; margin-bottom: 6px; line-height: 1.4; }
+  .detail .dl { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
+  .detail .chip {
+    font-size: 11px; padding: 3px 9px; border-radius: 20px;
+    background: var(--panel-2); color: var(--muted); border: 1px solid var(--line);
+  }
+  .detail .sec-title {
+    font-size: 12px; color: var(--muted); text-transform: uppercase;
+    letter-spacing: .8px; margin: 18px 0 10px; border-bottom: 1px solid var(--line); padding-bottom: 6px;
+  }
+  .seg {
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+  }
+  .seg .txt { font-size: 13px; line-height: 1.7; color: var(--text); white-space: pre-line; }
+  .seg .hashes { margin-top: 8px; display: flex; flex-direction: column; gap: 3px; }
+  .seg .hash {
+    margin-top: 8px; font-size: 10.5px; color: var(--muted);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    word-break: break-all; display: flex; align-items: center; gap: 6px;
+  }
+  .seg .hash::before { content: "#"; color: var(--l2); font-weight: 700; }
+  .node-hash {
+    font-size: 10.5px; color: var(--muted);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    word-break: break-all; margin-bottom: 4px;
+  }
+  .empty-hint { color: var(--muted); font-size: 12.5px; font-style: italic; }
+  .proj-tag {
+    display: inline-block; font-size: 12px; color: var(--l0);
+    background: rgba(245,166,35,.12); border: 1px solid rgba(245,166,35,.3);
+    padding: 4px 10px; border-radius: 8px; margin-bottom: 10px;
+  }
+  /* 批注编辑区（节点详情面板内） */
+  .cmt-box { margin-top: 6px; }
+  .cmt-box textarea {
+    width: 100%; min-height: 62px; resize: vertical;
+    background: var(--bg); color: var(--text);
+    border: 1px solid var(--line); border-radius: 8px;
+    padding: 9px 11px; font-size: 13px; line-height: 1.6; outline: none;
+    font-family: inherit;
+  }
+  .cmt-box textarea:focus { border-color: var(--accent); }
+  .cmt-actions { display: flex; gap: 8px; margin-top: 8px; align-items: center; }
+  .btn {
+    font-size: 12.5px; padding: 6px 13px; border-radius: 8px; cursor: pointer;
+    border: 1px solid var(--line); background: var(--panel-2); color: var(--text);
+    transition: all .12s;
+  }
+  .btn:hover { border-color: var(--accent); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.ghost { background: transparent; color: var(--muted); }
+  .cmt-saved { font-size: 11.5px; color: var(--l2); }
+  /* 有意见的节点右上角标记 */
+  .node .cmt-flag {
+    position: absolute; left: -7px; top: -7px;
+    width: 18px; height: 18px; border-radius: 50%;
+    background: var(--l0); color: #1a1200; font-size: 11px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 2px 6px rgba(0,0,0,.4); z-index: 4;
+  }
+  /* 底部反馈栏 */
+  .feedback-bar {
+    position: fixed; left: 0; right: 380px; bottom: 0;
+    background: var(--panel); border-top: 1px solid var(--line);
+    padding: 10px 22px; display: flex; align-items: center; gap: 14px;
+    box-shadow: 0 -4px 20px rgba(0,0,0,.3); z-index: 20;
+  }
+  .feedback-bar .fb-page {
+    flex: 1; background: var(--bg); color: var(--text);
+    border: 1px solid var(--line); border-radius: 8px;
+    padding: 8px 12px; font-size: 13px; outline: none; font-family: inherit;
+  }
+  .feedback-bar .fb-page:focus { border-color: var(--accent); }
+  .feedback-bar .fb-count { font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .feedback-bar .fb-count b { color: var(--l0); }
+  .canvas-wrap { padding-bottom: 56px; }
+  .toast {
+    position: fixed; bottom: 70px; left: 50%; transform: translateX(-50%);
+    background: var(--l2); color: #04231a; padding: 10px 20px; border-radius: 10px;
+    font-size: 13px; font-weight: 600; opacity: 0; transition: opacity .25s;
+    pointer-events: none; z-index: 50; box-shadow: var(--shadow);
+  }
+  .toast.show { opacity: 1; }
+  .legend { display: flex; gap: 16px; font-size: 11.5px; color: var(--muted); align-items: center; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>📚 知识图谱预览</h1>
+  <div class="meta" id="meta"></div>
+  <div class="legend">
+    <span><i style="background:var(--l0)"></i>层级0 主题</span>
+    <span><i style="background:var(--l1)"></i>层级1 分类</span>
+    <span><i style="background:var(--l2)"></i>层级2 知识点</span>
+  </div>
+  <div class="switcher" id="switcher" style="display:none">
+    <label style="font-size:12px;color:var(--muted)">选择课程</label>
+    <select id="lessonSelect"></select>
+  </div>
+</header>
+<div class="layout">
+  <div class="canvas-wrap">
+    <div id="canvas">
+      <svg class="edges" id="edges"></svg>
+    </div>
+  </div>
+  <div class="detail empty" id="detail">点击左侧任意节点查看详细内容</div>
+</div>
+
+<div class="feedback-bar">
+  <input class="fb-page" id="pageComment" type="text"
+         placeholder="对本课程的整体修改意见（页面级）…如：空域知识下 6 个子节点顺序需调整" />
+  <span class="fb-count" id="fbCount">未添加意见</span>
+  <button class="btn ghost" id="clearBtn">清空</button>
+  <button class="btn primary" id="copyBtn">📋 复制修改意见</button>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+// 数据由 render.py 注入：数组，每项 { lessonId, meta:{textbookId,unitId,lessonId}, graph:{nodes,edges} }
+const DATASETS = [{"lessonId": "7989338958046234381", "meta": {"lessonId": "7989338958046234381"}, "graph": {"nodes": [{"id": "7989338958046234381", "label": "任务1 无人机的组装", "level": 0, "dataHash": "fm-doc-id-f5f2d398215c9557", "displayCode": "UAS_P2T1", "projectTitle": "项目二 无人机装调检修", "projectDataHash": "fm-doc-id-d9c60f33cfa2e76b", "knowledgeCategory": "元认知", "cognitiveDimension": "理解"}, {"id": "7989338958046234381_n1", "label": "机架的组装", "level": 1, "dataHash": "fm-doc-id-d26b37841f410d2c", "description": [{"text": "机架，指多旋翼无人机的机身，是多旋翼无人机其他结构的安装基础，起承载作用。", "dataHash": "fm-doc-id-e532f2f42af3b3e0"}, {"text": "根据旋翼的轴数，可分为三轴、四轴、六轴、八轴，甚至十八轴等。而根据旋翼数，可分为三旋翼、四旋翼、六旋翼、八旋翼，甚至十八旋翼等（图2.1.1）。一般情况下，轴数和旋翼数是相等的，但也有特殊情况。比如，三轴六旋翼是在三轴每个轴上下各安装一个电机构成六旋翼。", "dataHash": "fm-doc-id-a54077d5b417d402"}, {"text": "轴距是指机架对角线两个电机或者桨叶中心的距离，单位一般为毫米（图2.1.2）。轴距的大小限制了螺旋桨的最大尺寸，从而限定了螺旋桨能产生的最大拉力，也就是直接影响到无人机的载重能力。", "dataHash": "fm-doc-id-34e41c0ab8950102"}, {"text": "机架在组装过程中需注意：\n（1）检查机架零部件是否缺少。\n（2）零部件是否有破损、变形。\n（3）螺丝数量是否足够，螺丝长度是否合适。\n（4）正常使用符合螺丝规格的螺丝刀，防止螺丝滑丝。\n（5）焊接时，注意不能有虚焊，防止在飞行过程中因为抖动而导致接口松动。\n（6）上螺丝时，按照对角线原则拧螺丝，待所有螺丝上完再拧紧。\n（7）同颜色机臂装在同一侧，方便飞行时辨认机头方向。", "dataHash": "fm-doc-id-76343fc562d33d21", "sourceHashes": [{"text": "机架在组装过程中需注意：", "dataHash": "fm-doc-id-76343fc562d33d21"}, {"text": "（1）检查机架零部件是否缺少。", "dataHash": "fm-doc-id-48231a67d437f237"}, {"text": "（2）零部件是否有破损、变形。", "dataHash": "fm-doc-id-3e7f5d17a9397026"}, {"text": "（3）螺丝数量是否足够，螺丝长度是否合适。", "dataHash": "fm-doc-id-e14f4d99984d8493"}, {"text": "（4）正常使用符合螺丝规格的螺丝刀，防止螺丝滑丝。", "dataHash": "fm-doc-id-b26fdf662d037f31"}, {"text": "（5）焊接时，注意不能有虚焊，防止在飞行过程中因为抖动而导致接口松动。", "dataHash": "fm-doc-id-a8489b2a28d17a25"}, {"text": "（6）上螺丝时，按照对角线原则拧螺丝，待所有螺丝上完再拧紧。", "dataHash": "fm-doc-id-9270e368ecd33bbf"}, {"text": "（7）同颜色机臂装在同一侧，方便飞行时辨认机头方向。", "dataHash": "fm-doc-id-27c489fa91409fb7"}]}], "knowledgeCategory": "事实性", "cognitiveDimension": "理解", "tags": "重点"}, {"id": "7989338958046234381_n2", "label": "动力系统的组装", "level": 1, "dataHash": "fm-doc-id-4252774c7bceb35b", "description": [{"text": "动力系统一般包括以下几部分：电机、电调、螺旋桨和电池。", "dataHash": "fm-doc-id-a3b4e7e6d9c91996"}], "knowledgeCategory": "事实性", "cognitiveDimension": "记忆", "tags": "重点"}, {"id": "7989338958046234381_n3", "label": "电机", "level": 2, "dataHash": "fm-doc-id-3a7b9c1234f4bbd9", "description": [{"text": "在无人机组装过程中，一般会选用无刷电机进行组装。无刷电机在电磁结构上与有刷直流电机一样，但其电枢绕组放在定子上，转子上安装永磁铁（图2.1.3、图2.1.4）。电机的电枢绕组一般采用多相形式，经由驱动器接到直流电源上，定子采用电子换向代替有刷电机的电刷和机械换向器，依靠改变输入到无刷电机定子线圈上的电流频率和波形，在绕组线圈周围形成一个绕电机几何轴心旋转的磁场，这个磁场驱动转子上的永磁铁转动，和转子磁极主磁场相互作用产生转矩使电机旋转。", "dataHash": "fm-doc-id-57fd66d0ac25bf94"}, {"text": "1/2", "dataHash": "fm-doc-id-7660fd17e372cf49"}, {"text": "2/2", "dataHash": "fm-doc-id-cab23966b856bdee"}], "knowledgeCategory": "概念性", "cognitiveDimension": "理解"}, {"id": "7989338958046234381_n4", "label": "电调", "level": 2, "dataHash": "fm-doc-id-58879a7ac8053d1d", "description": [{"text": "电子调速器，简称电调，是控制电机转速的调速器，必须与电机相匹配（图2.1.5）。", "dataHash": "fm-doc-id-dddee2ccfb1bddcb"}, {"text": "无人机用电调具有以下作用：\n（1）电调最基本的功能就是通过飞控板给定PWM（pulse-width modulation）信号进行电动机调速。\n（2）电调为遥控接收机上其他通道的舵机供电。\n（3）电调为飞控供电。\n（4）充当换相器的角色，因为无刷电机没有电刷进行换相，所以需要靠电调进行电子换相。\n（5）电调还有一些其他辅助功能，如电池保护、启动保护和刹车等。", "dataHash": "fm-doc-id-f174c88b53d0f6ec", "sourceHashes": [{"text": "无人机用电调具有以下作用：", "dataHash": "fm-doc-id-f174c88b53d0f6ec"}, {"text": "（1）电调最基本的功能就是通过飞控板给定PWM（pulse-width modulation）信号进行电动机调速。", "dataHash": "fm-doc-id-a1f5661362edd38e"}, {"text": "（2）电调为遥控接收机上其他通道的舵机供电。", "dataHash": "fm-doc-id-8fe3fb638c9ff952"}, {"text": "（3）电调为飞控供电。", "dataHash": "fm-doc-id-ba9a4624b0002619"}, {"text": "（4）充当换相器的角色，因为无刷电机没有电刷进行换相，所以需要靠电调进行电子换相。", "dataHash": "fm-doc-id-2c1d51eb0db068e9"}, {"text": "（5）电调还有一些其他辅助功能，如电池保护、启动保护和刹车等。", "dataHash": "fm-doc-id-1c9fd9cc3c416fb6"}]}], "knowledgeCategory": "概念性", "cognitiveDimension": "理解"}, {"id": "7989338958046234381_n5", "label": "螺旋桨", "level": 2, "dataHash": "fm-doc-id-c5556cfca326487e", "description": [{"text": "螺旋桨的材质一般分为三类：木质、塑料、碳纤维。", "dataHash": "fm-doc-id-fa2f8a3a9e5aa975"}, {"text": "木质螺旋桨一般采用榉木或者桦木等坚硬的材料通过数控机床加工而成（图2.1.6）。木质螺旋桨历史悠久，适用于油动发动机。木质螺旋桨易碰伤、抗雨性能差、受潮热气候容易变形。木质螺旋桨桨叶的制作工艺较为成熟。大尺寸桨叶加工时间较长、重量较重、转动惯量大、调速响应略弱。", "dataHash": "fm-doc-id-20813bbcd65c9e42"}, {"text": "塑料螺旋桨采用塑料注塑而成，原材料成本低，批量化加工，价格低廉，产量大，颜色丰富。塑料螺旋桨桨叶强度差，桨尖容易变形。", "dataHash": "fm-doc-id-6481b5a43c4b6664"}, {"text": "碳纤维螺旋桨，是使用碳纤维制成的（图2.1.7）。碳纤维是一种与人造丝、合成纤维类似的纤维状碳材料。碳纤维的材料由于有优异的硬度，可制成合适的桨形，因此非常适合技巧性飞行。其效率优于木桨，价格比木桨更贵。", "dataHash": "fm-doc-id-7f3585c65fc25528"}, {"text": "一般情况下，在不超负载的情况下，多旋翼无人机可以更换很多不同的螺旋桨，同样可以飞起来，但是飞行效果和续航时间却是大相径庭。螺旋桨选得适合，飞行更稳，航拍效果、续航时间都兼得；选得不好，可能效果就相反。", "dataHash": "fm-doc-id-b93c085eda6f0ee4"}, {"text": "相同的电机，不同的电压值，用的螺旋桨也不一样。每个电机都会有一个推荐的螺旋桨。相对来说，螺旋桨配得过小，不能发挥最大推力；螺旋桨配得过大，电机会过热，会退磁，会造成电机性能永久下降。", "dataHash": "fm-doc-id-7661bb9bc3c2e32f"}], "knowledgeCategory": "事实性", "cognitiveDimension": "理解"}, {"id": "7989338958046234381_n6", "label": "电池", "level": 2, "dataHash": "fm-doc-id-e4cae216728c095f", "description": [{"text": "一般电池的主要参数包括以下内容（图2.1.8）。", "dataHash": "fm-doc-id-a9d31e2cb31aef35"}, {"text": "（1）电压。", "dataHash": "fm-doc-id-16339e7b6101d831"}, {"text": "锂电池组包含两部分：电池和锂电池保护线路。在电池组中是把多个电池串联起来，得到所需要的工作电压。如果所需要的是更高的容量和更大的电流，那就应该把电池并联起来。另外，还有一些电池组，把串联和并联这两种方法结合起来。多旋翼无人机通常用的是锂聚合物电池，单节电压是3.7V，3S1P表示3片锂聚合物电池的串联，电压是11.1V（其中S表示串联，P表示并联）。又如2S2P表示2片锂聚合物电池的串联。两个这样的串联结构并联，总电压是7.4V，电流是单个电池的两倍。", "dataHash": "fm-doc-id-7179f75845ff10b4"}, {"text": "（2）电池容量。", "dataHash": "fm-doc-id-4ed3db2b78ffc2c6"}, {"text": "电池的容量额定值表示其输出电量。电池获取电量越快，持续的时间就越短。很多时候，电池容量单位为mAh，1Ah=1000mAh，因此2.2Ah是2200mAh。", "dataHash": "fm-doc-id-5ab30d3685b06abb"}, {"text": "（3）放电额定值。", "dataHash": "fm-doc-id-0907037a5861fc0a"}, {"text": "“C”表示电池相对于其最大容量可以放电的速率。如果电池以高于放电额定值的速率放电，可能会损坏电池，严重时，可能会造成安全隐患。如果电池的放电额定值为15C，则意味着一次可以从中获取的最大放电电流等于其容量的15倍。以使用容量2200 mAh的电池为例，这意味着可以安全地从中获得的最大放电电流为15×2200mA=33000mA（或33A）。", "dataHash": "fm-doc-id-539e12c37aeb1153"}, {"text": "电池标签上列出的放电等级是根据制造商认为电池组在放电过程中能处理的内容，而不降低电池组的性能。同时，具有较高放电倍率的电池组具有较低的内阻。许多电池提供两种放电额定值，如30C/60C。第一个数字意味着它将持续支持30 C放电，并且对于短脉冲（通常少于15s）它应该支持60C。这允许在油门快速更换期间最高可出现60C，但不应该是经常使用的。如果需要更高的电流水平，请购买更高容量，且更高额定C数的电池组。", "dataHash": "fm-doc-id-9aa6abb32c8bf0d6"}, {"text": "（4）内阻。", "dataHash": "fm-doc-id-102cec4ee8c4e816"}, {"text": "表示电池或电池组的内阻。一些充电器将在充电周期内测试一个电池组内每个电池的内阻。随着内阻增加，电池性能会降低。因此，作为一般规则，电阻越低，电池提供的性能越高。通常，具有高放电容量的电池具有较低的内阻。电池组标签通常是制造商试图将其产品置于最佳状态。如图2.1.9所示，为无人机电池内阻测量仪。", "dataHash": "fm-doc-id-65accc6099546470"}, {"text": "（该电池的内阻为27.2mΩ，电压为3.76V）", "dataHash": "fm-doc-id-1c7c298817dce6c2"}], "knowledgeCategory": "事实性", "cognitiveDimension": "记忆"}, {"id": "7989338958046234381_n7", "label": "飞控系统的组装", "level": 1, "dataHash": "fm-doc-id-b9e5c8e59c53e553", "description": [{"text": "飞行控制系统，简称飞控，是无人机的核心部件。一般主要由主控单元、IMU（惯性测量单元）、GPS指南针模块等部件组成。", "dataHash": "fm-doc-id-896d3aef44be2437"}, {"text": "（1）主控单元，是飞行控制系统的核心，通过它将IMU、GPS指南针、舵机和遥控接收机等设备接入飞行控制系统，从而实现飞行器自主飞行功能。", "dataHash": "fm-doc-id-fcfe90646cc37fcc"}, {"text": "（2）IMU（惯性测量单元），包含三轴加速度计、三轴角速度计和气压高度计，是高精度感应飞行器姿态、角度、速度和高度的元器件集合体，在飞行辅助功能中充当极其重要的角色。", "dataHash": "fm-doc-id-6c81963c5293e3df"}, {"text": "（3）GPS指南针模块，包含GPS模块和指南针模块，用于精确确定飞行器的方向及经纬度。对于失控保护自动返航、精准定位悬停等功能的实现至关重要。", "dataHash": "fm-doc-id-e8be3958f57db531"}, {"text": "飞控安装时需注意：\n（1）尽量将飞控安装至飞行器的几何中心位置。\n（2）需注意飞控的安装方向是否和飞行器的头部方向一致。\n（3）插线时，注意负极在上，信号线在下。", "dataHash": "fm-doc-id-bdbf7068409038cb", "sourceHashes": [{"text": "飞控安装时需注意：", "dataHash": "fm-doc-id-bdbf7068409038cb"}, {"text": "（1）尽量将飞控安装至飞行器的几何中心位置。", "dataHash": "fm-doc-id-f6bd01e54ac8c560"}, {"text": "（2）需注意飞控的安装方向是否和飞行器的头部方向一致。", "dataHash": "fm-doc-id-fc2739f84d39c810"}, {"text": "（3）插线时，注意负极在上，信号线在下。", "dataHash": "fm-doc-id-b41c61153d6b0bf8"}]}, {"text": "", "dataHash": "fm-doc-id-1a33dda3c952b9af"}], "knowledgeCategory": "概念性", "cognitiveDimension": "理解", "tags": "重点"}], "edges": [{"source": "7989338958046234381", "target": "7989338958046234381_n1", "type": "父子", "description": "任务1 无人机的组装包含机架的组装"}, {"source": "7989338958046234381", "target": "7989338958046234381_n2", "type": "父子", "description": "任务1 无人机的组装包含动力系统的组装"}, {"source": "7989338958046234381_n2", "target": "7989338958046234381_n3", "type": "父子", "description": "动力系统的组装包含电机"}, {"source": "7989338958046234381_n2", "target": "7989338958046234381_n4", "type": "父子", "description": "动力系统的组装包含电调"}, {"source": "7989338958046234381_n2", "target": "7989338958046234381_n5", "type": "父子", "description": "动力系统的组装包含螺旋桨"}, {"source": "7989338958046234381_n2", "target": "7989338958046234381_n6", "type": "父子", "description": "动力系统的组装包含电池"}, {"source": "7989338958046234381", "target": "7989338958046234381_n7", "type": "父子", "description": "任务1 无人机的组装包含飞控系统的组装"}]}}];
+
+const COL_W = 300;      // 层级横向间距
+const NODE_H = 62;      // 单节点占位高度
+const V_GAP = 16;       // 兄弟节点垂直间距
+const canvas = document.getElementById('canvas');
+const edgesSvg = document.getElementById('edges');
+const detail = document.getElementById('detail');
+const metaEl = document.getElementById('meta');
+
+let current = null;      // 当前数据集
+let nodeMap = {};        // id -> node
+let childrenMap = {};    // id -> [childId]
+let elMap = {};          // id -> DOM 元素（用于读取真实坐标画线）
+let collapsed = new Set();
+let selectedId = null;
+
+// 批注存储：按 lessonId 分组。{ [lessonId]: { nodes: {nodeId:{label,level,text}}, page: "" } }
+// 存在内存中（纯静态页，无需后端）。切换 lesson 不丢，复制时汇总所有有意见的 lesson。
+const feedback = {};
+function fbFor(lessonId) {
+  if (!feedback[lessonId]) feedback[lessonId] = { nodes: {}, page: "" };
+  return feedback[lessonId];
+}
+
+function buildTree(graph) {
+  nodeMap = {};
+  childrenMap = {};
+  graph.nodes.forEach(n => { nodeMap[n.id] = n; childrenMap[n.id] = []; });
+  graph.edges.forEach(e => {
+    if (childrenMap[e.source]) childrenMap[e.source].push(e.target);
+  });
+  // 根 = level 0，或无入边的节点
+  const hasParent = new Set(graph.edges.map(e => e.target));
+  return graph.nodes.filter(n => n.level === 0 || !hasParent.has(n.id)).map(n => n.id);
+}
+
+// 递归布局：用节点真实高度 node._h 计算占位，返回子树总高度，写入 node._x/_y。
+// node._y 为该节点顶端 y 坐标；节点垂直居中对齐其子树跨度。
+function layout(id, depth, cursorY) {
+  const node = nodeMap[id];
+  node._x = depth * COL_W;
+  const selfH = (node._h || NODE_H) + V_GAP;
+  const kids = collapsed.has(id) ? [] : childrenMap[id];
+  if (kids.length === 0) {
+    node._y = cursorY;
+    return selfH;
+  }
+  let y = cursorY;
+  let total = 0;
+  kids.forEach(k => {
+    const h = layout(k, depth + 1, y);
+    y += h; total += h;
+  });
+  // 父节点中心对齐首末子节点中心
+  const first = nodeMap[kids[0]];
+  const last = nodeMap[kids[kids.length - 1]];
+  const kidsMid = (first._y + (first._h || NODE_H) / 2 + last._y + (last._h || NODE_H) / 2) / 2;
+  node._y = kidsMid - (node._h || NODE_H) / 2;
+  // 子树可能比父节点自身矮，取较大者
+  return Math.max(total, selfH);
+}
+
+function render() {
+  // 清空旧节点（保留 svg）
+  [...canvas.querySelectorAll('.node')].forEach(n => n.remove());
+  elMap = {};
+  const roots = buildTree(current.graph);
+
+  // —— 阶段一：建节点并入 DOM（先不定位），测量真实高度 ——
+  Object.values(nodeMap).forEach(n => {
+    const el = document.createElement('div');
+    el.className = 'node' + (n.id === selectedId ? ' selected' : '');
+    el.dataset.level = n.level;
+    el.style.visibility = 'hidden';
+
+    const badges = [];
+    if (n.tags) badges.push(`<span class="badge tag">${n.tags}</span>`);
+    if (n.knowledgeCategory) badges.push(`<span class="badge">${n.knowledgeCategory}</span>`);
+    if (n.cognitiveDimension) badges.push(`<span class="badge">${n.cognitiveDimension}</span>`);
+
+    el.innerHTML = `<div class="label"><span class="dot"></span><span>${escapeHtml(n.label)}</span></div>` +
+                   (badges.length ? `<div class="badges">${badges.join('')}</div>` : '');
+
+    const kids = childrenMap[n.id];
+    if (kids && kids.length) {
+      const t = document.createElement('div');
+      t.className = 'toggle';
+      t.textContent = collapsed.has(n.id) ? '+' : '−';
+      t.onclick = (ev) => { ev.stopPropagation(); toggle(n.id); };
+      el.appendChild(t);
+    }
+    // 有意见的节点加标记
+    if (current && fbFor(current.lessonId).nodes[n.id]) {
+      const flag = document.createElement('div');
+      flag.className = 'cmt-flag';
+      flag.textContent = '✎';
+      flag.title = '该节点有修改意见';
+      el.appendChild(flag);
+    }
+    el.onclick = () => select(n.id);
+    canvas.appendChild(el);
+    elMap[n.id] = el;
+  });
+  // 测量真实高度/宽度写入 node._h / node._w
+  Object.values(nodeMap).forEach(n => {
+    n._h = elMap[n.id].offsetHeight;
+    n._w = elMap[n.id].offsetWidth;
+  });
+
+  // —— 阶段二：按真实高度布局 ——
+  let cursorY = 0;
+  roots.forEach(r => { cursorY += layout(r, 0, cursorY); });
+
+  // —— 阶段三：算内容包围盒 ——
+  let contentW = 0, contentH = 0;
+  Object.values(nodeMap).forEach(n => {
+    if (n._x === undefined) return;
+    contentW = Math.max(contentW, n._x + (n._w || 200));
+    contentH = Math.max(contentH, n._y + (n._h || NODE_H));
+  });
+
+  // 居中偏移：内容比视口小时居中，否则留固定边距
+  const wrap = canvas.parentElement;      // .canvas-wrap 视口
+  const PAD = 48;
+  const vw = wrap.clientWidth, vh = wrap.clientHeight;
+  const offsetX = Math.max(PAD, (vw - contentW) / 2);
+  const offsetY = Math.max(PAD, (vh - contentH) / 2);
+
+  // —— 阶段四：定位并显示 ——
+  Object.values(nodeMap).forEach(n => {
+    if (n._x === undefined) return;
+    const el = elMap[n.id];
+    el.style.left = (n._x + offsetX) + 'px';
+    el.style.top = (n._y + offsetY) + 'px';
+    el.style.visibility = 'visible';
+  });
+
+  // canvas 至少填满视口，内容超出时按内容+边距撑开
+  canvas.style.width = Math.max(vw, contentW + offsetX + PAD) + 'px';
+  canvas.style.height = Math.max(vh, contentH + offsetY + PAD) + 'px';
+  // 节点已定位，用真实坐标画线（消除偏移）
+  drawEdges();
+}
+
+function drawEdges() {
+  edgesSvg.innerHTML = '';
+  edgesSvg.setAttribute('width', canvas.style.width);
+  edgesSvg.setAttribute('height', canvas.style.height);
+  current.graph.edges.forEach(e => {
+    if (collapsed.has(e.source)) return;
+    const se = elMap[e.source], te = elMap[e.target];
+    if (!se || !te) return;
+    // 读取真实布局坐标：起点=父节点右边缘中点，终点=子节点左边缘中点
+    const x1 = se.offsetLeft + se.offsetWidth;
+    const y1 = se.offsetTop + se.offsetHeight / 2;
+    const x2 = te.offsetLeft;
+    const y2 = te.offsetTop + te.offsetHeight / 2;
+    const mx = (x1 + x2) / 2;
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`);
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', '#3a4761');
+    path.setAttribute('stroke-width', '1.6');
+    edgesSvg.appendChild(path);
+  });
+}
+
+function toggle(id) {
+  if (collapsed.has(id)) collapsed.delete(id); else collapsed.add(id);
+  render();
+}
+
+function select(id) {
+  selectedId = id;
+  render();
+  const n = nodeMap[id];
+  const chips = [];
+  chips.push(`<span class="chip">层级 ${n.level}</span>`);
+  if (n.knowledgeCategory) chips.push(`<span class="chip">${n.knowledgeCategory}</span>`);
+  if (n.cognitiveDimension) chips.push(`<span class="chip">${n.cognitiveDimension}</span>`);
+  if (n.tags) chips.push(`<span class="chip" style="color:var(--l0)">${n.tags}</span>`);
+
+  let html = '';
+  if (n.projectTitle) {
+    html += `<div class="proj-tag">📁 ${escapeHtml(n.projectTitle)}</div>`;
+  }
+  html += `<h2>${escapeHtml(n.label)}</h2>`;
+  if (n.dataHash) html += `<div class="node-hash"># ${n.dataHash}</div>`;
+  if (n.projectDataHash) html += `<div class="node-hash">项目 # ${n.projectDataHash}</div>`;
+  html += `<div class="dl">${chips.join('')}</div>`;
+
+  const desc = n.description || [];
+  if (desc.length) {
+    html += `<div class="sec-title">详细说明（${desc.length} 段）</div>`;
+    desc.forEach(d => {
+      html += `<div class="seg"><div class="txt">${escapeHtml(d.text)}</div>`;
+      if (d.sourceHashes && d.sourceHashes.length) {
+        // 合并段：列出全部源 hash（零丢失可追溯）
+        html += `<div class="hashes">` +
+          d.sourceHashes.map(s => `<div class="hash">${s.dataHash}</div>`).join('') +
+          `</div>`;
+      } else if (d.dataHash) {
+        html += `<div class="hash">${d.dataHash}</div>`;
+      }
+      html += `</div>`;
+    });
+  } else {
+    html += `<div class="sec-title">详细说明</div><div class="empty-hint">该节点为分类/主题节点，无独立正文说明。</div>`;
+  }
+
+  // 节点级批注编辑区
+  const existing = fbFor(current.lessonId).nodes[id];
+  html += `<div class="sec-title">修改意见（该节点）</div>` +
+    `<div class="cmt-box">` +
+    `<textarea id="nodeCmt" placeholder="写下对「${escapeHtml(n.label)}」的修改意见，例如：该节点应为 level 1 / 应删除 / 归类错误…">${existing ? escapeHtml(existing.text) : ''}</textarea>` +
+    `<div class="cmt-actions">` +
+    `<button class="btn primary" id="saveCmtBtn">保存意见</button>` +
+    (existing ? `<button class="btn ghost" id="delCmtBtn">删除</button><span class="cmt-saved">✓ 已记录</span>` : '') +
+    `</div></div>`;
+
+  detail.className = 'detail';
+  detail.innerHTML = html;
+
+  document.getElementById('saveCmtBtn').onclick = () => {
+    const txt = document.getElementById('nodeCmt').value.trim();
+    const store = fbFor(current.lessonId).nodes;
+    if (txt) {
+      store[id] = { label: n.label, level: n.level, text: txt };
+    } else {
+      delete store[id];
+    }
+    updateFbCount(); render(); select(id);
+    showToast(txt ? '已记录该节点意见' : '已清除该节点意见');
+  };
+  const delBtn = document.getElementById('delCmtBtn');
+  if (delBtn) delBtn.onclick = () => {
+    delete fbFor(current.lessonId).nodes[id];
+    updateFbCount(); render(); select(id);
+    showToast('已删除该节点意见');
+  };
+}
+
+function escapeHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// —— 反馈：计数、生成文本、复制 ——
+function countFeedback() {
+  let n = 0;
+  Object.values(feedback).forEach(f => {
+    n += Object.keys(f.nodes).length;
+    if (f.page && f.page.trim()) n += 1;
+  });
+  return n;
+}
+
+function updateFbCount() {
+  const c = countFeedback();
+  const el = document.getElementById('fbCount');
+  el.innerHTML = c ? `已添加 <b>${c}</b> 条意见` : '未添加意见';
+}
+
+function buildFeedbackText() {
+  // 汇总所有有意见的 lesson；只带定位信息 + 意见（正文由大模型自行读 json 定位）
+  const lines = ['# 知识图谱修改意见', ''];
+  let any = false;
+  Object.keys(feedback).forEach(lessonId => {
+    const f = feedback[lessonId];
+    const nodeIds = Object.keys(f.nodes);
+    const hasPage = f.page && f.page.trim();
+    if (!nodeIds.length && !hasPage) return;
+    any = true;
+    lines.push(`## 课程 lessonId: ${lessonId}`);
+    lines.push(`对应文件: output/knowledgegraph/${lessonId}.json`);
+    lines.push('');
+    if (nodeIds.length) {
+      lines.push('### 节点级意见');
+      nodeIds.forEach(nid => {
+        const c = f.nodes[nid];
+        lines.push(`- [节点 ${nid}]「${c.label}」(level ${c.level})`);
+        lines.push(`  意见: ${c.text}`);
+      });
+      lines.push('');
+    }
+    if (hasPage) {
+      lines.push('### 页面级意见');
+      lines.push(`- ${f.page.trim()}`);
+      lines.push('');
+    }
+  });
+  if (!any) return '';
+  lines.push('---');
+  lines.push('请据以上意见对相应 lesson 的 json 二次修改，改后用 validate.py 校验、render.py 重新渲染。');
+  return lines.join('\n');
+}
+
+function copyFeedback() {
+  const text = buildFeedbackText();
+  if (!text) { showToast('尚未添加任何修改意见'); return; }
+  const done = () => showToast('修改意见已复制，粘贴给大模型即可');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+  } else {
+    fallbackCopy(text, done);
+  }
+}
+
+function fallbackCopy(text, done) {
+  const ta = document.createElement('textarea');
+  ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); done(); }
+  catch (e) { showToast('复制失败，请手动选择'); }
+  document.body.removeChild(ta);
+}
+
+let toastTimer = null;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+function loadDataset(idx) {
+  current = DATASETS[idx];
+  collapsed = new Set();
+  selectedId = null;
+  detail.className = 'detail empty';
+  detail.textContent = '点击左侧任意节点查看详细内容';
+  const m = current.meta || {};
+  const rootNode = current.graph.nodes.find(n => n.level === 0) || {};
+  const dc = rootNode.displayCode;
+  metaEl.innerHTML =
+    (dc ? `<span>代码 <b>${escapeHtml(dc)}</b></span>` : '') +
+    `<span>课程 <b>${current.lessonId}</b></span>` +
+    (m.unitId ? `<span>单元 <b>${m.unitId}</b></span>` : '') +
+    (m.textbookId ? `<span>教材 <b>${m.textbookId}</b></span>` : '') +
+    `<span>节点 <b>${current.graph.nodes.length}</b></span>`;
+  // 同步当前课程的页面级意见到输入框
+  const pc = document.getElementById('pageComment');
+  if (pc) pc.value = fbFor(current.lessonId).page || '';
+  render();
+}
+
+// 初始化
+(function init() {
+  const sel = document.getElementById('lessonSelect');
+  if (DATASETS.length > 1) {
+    document.getElementById('switcher').style.display = 'flex';
+    DATASETS.forEach((d, i) => {
+      const o = document.createElement('option');
+      o.value = i;
+      const rootLabel = (d.graph.nodes.find(n => n.level === 0) || {}).label || d.lessonId;
+      o.textContent = `${d.lessonId} · ${rootLabel}`;
+      sel.appendChild(o);
+    });
+    sel.onchange = () => loadDataset(+sel.value);
+  }
+
+  // 页面级意见：实时写入当前课程
+  const pc = document.getElementById('pageComment');
+  pc.addEventListener('input', () => {
+    fbFor(current.lessonId).page = pc.value;
+    updateFbCount();
+  });
+  // 复制 / 清空
+  document.getElementById('copyBtn').onclick = copyFeedback;
+  document.getElementById('clearBtn').onclick = () => {
+    const c = countFeedback();
+    if (!c) { showToast('当前没有意见可清空'); return; }
+    if (!confirm(`确定清空全部 ${c} 条修改意见？`)) return;
+    Object.keys(feedback).forEach(k => delete feedback[k]);
+    pc.value = '';
+    updateFbCount(); render();
+    if (selectedId) select(selectedId);
+    showToast('已清空全部意见');
+  };
+
+  // 窗口尺寸变化时重新布局居中（防抖）
+  let rzTimer = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(rzTimer);
+    rzTimer = setTimeout(() => { if (current) render(); }, 150);
+  });
+
+  loadDataset(0);
+  updateFbCount();
+})();
+</script>
+</body>
+</html>

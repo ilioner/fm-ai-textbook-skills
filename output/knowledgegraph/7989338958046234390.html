@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>知识图谱预览</title>
+<style>
+  :root {
+    --bg: #0f1420;
+    --panel: #171d2b;
+    --panel-2: #1e2637;
+    --line: #2a3548;
+    --text: #e6ebf5;
+    --muted: #8a97ad;
+    --l0: #f5a623;
+    --l1: #4a9eff;
+    --l2: #35d0a5;
+    --accent: #6c8cff;
+    --shadow: 0 6px 24px rgba(0,0,0,.35);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+  }
+  header {
+    padding: 14px 22px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    flex-shrink: 0;
+    box-shadow: var(--shadow);
+    z-index: 10;
+  }
+  header h1 { font-size: 17px; font-weight: 600; letter-spacing: .5px; }
+  header .meta { font-size: 12px; color: var(--muted); display: flex; gap: 14px; }
+  header .meta b { color: var(--text); font-weight: 500; }
+  .switcher { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .switcher select {
+    background: var(--panel-2);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 7px 12px;
+    font-size: 13px;
+    outline: none;
+    cursor: pointer;
+  }
+  .layout { flex: 1; display: flex; min-height: 0; }
+  .canvas-wrap {
+    flex: 1;
+    overflow: auto;
+    position: relative;
+    background:
+      radial-gradient(circle at 1px 1px, rgba(255,255,255,.035) 1px, transparent 0);
+    background-size: 22px 22px;
+  }
+  #canvas { position: relative; }
+  svg.edges { position: absolute; top: 0; left: 0; pointer-events: none; overflow: visible; }
+  .node {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 10px 14px;
+    border-radius: 12px;
+    background: var(--panel-2);
+    border: none;
+    cursor: pointer;
+    transition: transform .12s, box-shadow .12s;
+    max-width: 230px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.25);
+  }
+  .node:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+  .node.selected { box-shadow: 0 0 0 2px var(--accent), var(--shadow); }
+  .node .label { font-size: 14px; font-weight: 600; line-height: 1.35; }
+  .node .badges { display: flex; flex-wrap: wrap; gap: 5px; }
+  .badge {
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 20px;
+    background: rgba(255,255,255,.08);
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .badge.tag { background: rgba(245,166,35,.18); color: var(--l0); }
+  .node .label { display: flex; align-items: flex-start; gap: 7px; }
+  .node .dot {
+    flex-shrink: 0; width: 9px; height: 9px; border-radius: 50%;
+    margin-top: 4px;
+  }
+  .node[data-level="0"] .dot { background: var(--l0); }
+  .node[data-level="1"] .dot { background: var(--l1); }
+  .node[data-level="2"] .dot { background: var(--l2); }
+  .node .toggle {
+    position: absolute;
+    right: -11px; top: 50%;
+    transform: translateY(-50%);
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 13px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    z-index: 3;
+  }
+  .node .toggle:hover { color: var(--text); border-color: var(--accent); }
+  .detail {
+    width: 380px;
+    flex-shrink: 0;
+    background: var(--panel);
+    border-left: 1px solid var(--line);
+    overflow-y: auto;
+    padding: 22px;
+  }
+  .detail.empty { display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 13px; text-align: center; }
+  .detail h2 { font-size: 18px; margin-bottom: 6px; line-height: 1.4; }
+  .detail .dl { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
+  .detail .chip {
+    font-size: 11px; padding: 3px 9px; border-radius: 20px;
+    background: var(--panel-2); color: var(--muted); border: 1px solid var(--line);
+  }
+  .detail .sec-title {
+    font-size: 12px; color: var(--muted); text-transform: uppercase;
+    letter-spacing: .8px; margin: 18px 0 10px; border-bottom: 1px solid var(--line); padding-bottom: 6px;
+  }
+  .seg {
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+  }
+  .seg .txt { font-size: 13px; line-height: 1.7; color: var(--text); white-space: pre-line; }
+  .seg .hashes { margin-top: 8px; display: flex; flex-direction: column; gap: 3px; }
+  .seg .hash {
+    margin-top: 8px; font-size: 10.5px; color: var(--muted);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    word-break: break-all; display: flex; align-items: center; gap: 6px;
+  }
+  .seg .hash::before { content: "#"; color: var(--l2); font-weight: 700; }
+  .node-hash {
+    font-size: 10.5px; color: var(--muted);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    word-break: break-all; margin-bottom: 4px;
+  }
+  .empty-hint { color: var(--muted); font-size: 12.5px; font-style: italic; }
+  .proj-tag {
+    display: inline-block; font-size: 12px; color: var(--l0);
+    background: rgba(245,166,35,.12); border: 1px solid rgba(245,166,35,.3);
+    padding: 4px 10px; border-radius: 8px; margin-bottom: 10px;
+  }
+  /* 批注编辑区（节点详情面板内） */
+  .cmt-box { margin-top: 6px; }
+  .cmt-box textarea {
+    width: 100%; min-height: 62px; resize: vertical;
+    background: var(--bg); color: var(--text);
+    border: 1px solid var(--line); border-radius: 8px;
+    padding: 9px 11px; font-size: 13px; line-height: 1.6; outline: none;
+    font-family: inherit;
+  }
+  .cmt-box textarea:focus { border-color: var(--accent); }
+  .cmt-actions { display: flex; gap: 8px; margin-top: 8px; align-items: center; }
+  .btn {
+    font-size: 12.5px; padding: 6px 13px; border-radius: 8px; cursor: pointer;
+    border: 1px solid var(--line); background: var(--panel-2); color: var(--text);
+    transition: all .12s;
+  }
+  .btn:hover { border-color: var(--accent); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.ghost { background: transparent; color: var(--muted); }
+  .cmt-saved { font-size: 11.5px; color: var(--l2); }
+  /* 有意见的节点右上角标记 */
+  .node .cmt-flag {
+    position: absolute; left: -7px; top: -7px;
+    width: 18px; height: 18px; border-radius: 50%;
+    background: var(--l0); color: #1a1200; font-size: 11px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 2px 6px rgba(0,0,0,.4); z-index: 4;
+  }
+  /* 底部反馈栏 */
+  .feedback-bar {
+    position: fixed; left: 0; right: 380px; bottom: 0;
+    background: var(--panel); border-top: 1px solid var(--line);
+    padding: 10px 22px; display: flex; align-items: center; gap: 14px;
+    box-shadow: 0 -4px 20px rgba(0,0,0,.3); z-index: 20;
+  }
+  .feedback-bar .fb-page {
+    flex: 1; background: var(--bg); color: var(--text);
+    border: 1px solid var(--line); border-radius: 8px;
+    padding: 8px 12px; font-size: 13px; outline: none; font-family: inherit;
+  }
+  .feedback-bar .fb-page:focus { border-color: var(--accent); }
+  .feedback-bar .fb-count { font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .feedback-bar .fb-count b { color: var(--l0); }
+  .canvas-wrap { padding-bottom: 56px; }
+  .toast {
+    position: fixed; bottom: 70px; left: 50%; transform: translateX(-50%);
+    background: var(--l2); color: #04231a; padding: 10px 20px; border-radius: 10px;
+    font-size: 13px; font-weight: 600; opacity: 0; transition: opacity .25s;
+    pointer-events: none; z-index: 50; box-shadow: var(--shadow);
+  }
+  .toast.show { opacity: 1; }
+  .legend { display: flex; gap: 16px; font-size: 11.5px; color: var(--muted); align-items: center; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>📚 知识图谱预览</h1>
+  <div class="meta" id="meta"></div>
+  <div class="legend">
+    <span><i style="background:var(--l0)"></i>层级0 主题</span>
+    <span><i style="background:var(--l1)"></i>层级1 分类</span>
+    <span><i style="background:var(--l2)"></i>层级2 知识点</span>
+  </div>
+  <div class="switcher" id="switcher" style="display:none">
+    <label style="font-size:12px;color:var(--muted)">选择课程</label>
+    <select id="lessonSelect"></select>
+  </div>
+</header>
+<div class="layout">
+  <div class="canvas-wrap">
+    <div id="canvas">
+      <svg class="edges" id="edges"></svg>
+    </div>
+  </div>
+  <div class="detail empty" id="detail">点击左侧任意节点查看详细内容</div>
+</div>
+
+<div class="feedback-bar">
+  <input class="fb-page" id="pageComment" type="text"
+         placeholder="对本课程的整体修改意见（页面级）…如：空域知识下 6 个子节点顺序需调整" />
+  <span class="fb-count" id="fbCount">未添加意见</span>
+  <button class="btn ghost" id="clearBtn">清空</button>
+  <button class="btn primary" id="copyBtn">📋 复制修改意见</button>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+// 数据由 render.py 注入：数组，每项 { lessonId, meta:{textbookId,unitId,lessonId}, graph:{nodes,edges} }
+const DATASETS = [{"lessonId": "7989338958046234390", "meta": {"lessonId": "7989338958046234390"}, "graph": {"nodes": [{"id": "7989338958046234390", "label": "任务1 了解背景知识", "level": 0, "dataHash": "fm-doc-id-e8db4b4f39c09bee", "displayCode": "UAS_P5T1", "projectTitle": "项目五 空地一体化测绘（空中部分）", "projectDataHash": "fm-doc-id-500790738810debf", "knowledgeCategory": "元认知", "cognitiveDimension": "理解"}, {"id": "7989338958046234390_n1", "label": "测量学知识介绍", "level": 1, "dataHash": "fm-doc-id-8aec76922a23843b", "description": [{"text": "测量学的主要研究方向是地球的形状、大小以及地球表面各种形态的科学，其任务主要表现为：确定地球的形状和大小；确定地面点的平面位置和高程；将地球表面的起伏状态和其他信息测绘成图。", "dataHash": "fm-doc-id-efe3e91606922a09"}, {"text": "测量学在我国现代化建设中起着非常重要的作用。它不仅体现在国防建设中，还体现在地质采矿、农田水利、交通运输及城市建设工程中，体现在对地震、山体滑坡等灾害的监测和测量中。从工程建设的角度出发，其作用主要表现在工程建设的三个阶段，即规划设计阶段所需的地形资料和地形图，施工阶段进行必要的施工放样与施工监测，运营阶段进行建筑物的稳定性监测和变形情况分析等。", "dataHash": "fm-doc-id-803a620553d09b7a"}, {"text": "测量学是一门古老的科学。相传早在公元前21世纪夏禹治水时，就已采用了准、绳、规、矩等简单的测量工具。公元前18世纪，古埃及就进行过土地丈量。中国人发明的指南针、浑天仪，外国人发明的望远镜、显微镜和水准器，以及三角学的应用和地图投影技术的改进，大大推动了测量学的发展。特别是近几十年来，电子学和空间技术的飞速发展，使测量技术逐步趋于自动化和数字化，使数据处理趋于程序化。当前，测量学这门历史悠久的学科已焕发出新的活力。", "dataHash": "fm-doc-id-5b604ce494f51c57"}], "knowledgeCategory": "概念性", "cognitiveDimension": "理解", "tags": "重点"}, {"id": "7989338958046234390_n2", "label": "测量学的细分方向", "level": 1, "dataHash": "fm-doc-id-80fefae4ab6a54e3", "description": [{"text": "随着社会生产的发展和科学技术的进步，测量学随之发展成多个分支。", "dataHash": "fm-doc-id-ffd1e14e637c1b79"}], "knowledgeCategory": "事实性", "cognitiveDimension": "理解", "tags": "重点"}, {"id": "7989338958046234390_n3", "label": "大地测量学", "level": 2, "dataHash": "fm-doc-id-06a0a581d33aa2e9", "description": [{"text": "大地测量学是研究在地球表面大范围内建立国家大地控制网，精确测定地球形状和大小以及地球重力场的理论、技术和方法的学科。随着卫星定位技术的发展，大地测量学不仅为空间科学和军事服务，还将为研究地球的形状、大小以及地表形变和地震预报等提供可靠的资料。", "dataHash": "fm-doc-id-d3f32c82dcc60b75"}], "knowledgeCategory": "概念性", "cognitiveDimension": "理解"}, {"id": "7989338958046234390_n4", "label": "地形测量学", "level": 2, "dataHash": "fm-doc-id-14ca4099bb9048d2", "description": [{"text": "地形测量学是研究将地球表面的起伏状态和其他信息测绘成图的理论、技术和方法的学科。各种比例尺地形图的测绘，为社会发展的规划设计提供了重要的资料。随着社会和经济的发展，地籍测量和房地产测量也得到迅猛发展，为地籍管理和房地产管理提供了有力的保障。", "dataHash": "fm-doc-id-656a3b7ce8130bf0"}], "knowledgeCategory": "概念性", "cognitiveDimension": "理解"}, {"id": "7989338958046234390_n5", "label": "摄影测量学", "level": 2, "dataHash": "fm-doc-id-d60fb38bba82d068", "description": [{"text": "摄影测量学是研究利用摄影像片等手段测定物体的形状、大小及其空间位置的学科。由于摄影像片包含的信息全面细致，现已被广泛应用于其他科学领域。根据获取像片方式的不同，又分为地面摄影测量、航空摄影测量、航天摄影测量、水下摄影测量等。", "dataHash": "fm-doc-id-f2983c3aa10cef21"}], "knowledgeCategory": "概念性", "cognitiveDimension": "理解"}, {"id": "7989338958046234390_n6", "label": "工程测量学", "level": 2, "dataHash": "fm-doc-id-f07911bde6cd7b52", "description": [{"text": "工程测量学是研究各项工程建设在规划设计、施工和竣工运营阶段所进行的各种测量工作的学科。它把各种测量理论应用于不同的工程建设，并研究各种测量新技术和新方法。", "dataHash": "fm-doc-id-87b2cef8176a8013"}], "knowledgeCategory": "概念性", "cognitiveDimension": "理解"}, {"id": "7989338958046234390_n7", "label": "地图制图学", "level": 2, "dataHash": "fm-doc-id-94be7d1f120301f3", "description": [{"text": "地图制图学是研究地图及其制作理论、工艺和应用的学科。根据已测得的成果成图，编制各种基本图和专业地图，完成各种地图的复制和印刷出版。", "dataHash": "fm-doc-id-10c5df5790f05278"}], "knowledgeCategory": "概念性", "cognitiveDimension": "理解"}, {"id": "7989338958046234390_n8", "label": "测绘的应用方向", "level": 1, "dataHash": "fm-doc-id-17cdd53e6b5f075c", "description": [{"text": "世界上许多国家正在建立民用无人机产业，并推动其得以广泛应用。中国无人机产业也取得了很大进展，其产品已经开始出口到国外高端市场。相关专家指出，随着无人机装备的发展和服务队伍的建设，我国已能够利用无人机为国民经济建设服务。无人机的发展已经进入社会应用的新时期。", "dataHash": "fm-doc-id-05e757028856fdfb"}, {"text": "基础测绘在国民经济和社会发展中，起着基础性、先行性、公益性的作用。航空摄影测量是基础测绘获取数据的最有效的途径之一，但局限于数据处理工作复杂、分辨率低，时效性和灵活性也远不能满足实际需求。无人机航摄系统作为传统航空摄影测量技术的有益补充，日益成为获取空间数据的重要手段，其具有机动灵活、高效快速、作业成本低的特点，已在困难地区大比例尺地形图测绘、应急救灾和土地执法监察等领域开展应用。为适应城镇发展的总体需求，提供综合地理、资源信息，各地区、各部门在综合规划、田野考古、国土整治监控、农田水利建设、基础设施建设、厂矿建设、居民小区建设、环保和生态建设等方面，无不需要最新、最完整的地形资料，这已成为各级政府部门和新建开发区亟待解决的问题。无人机测绘技术也可以被广泛应用于国家生态环境保护、矿产资源勘探、海洋环境监测、土地利用调查、水资源开发、农作物长势监测与估产、农业作业、自然灾害监测与评估、城市规划与市政管理、森林病虫害防护与监测、公共安全、国防事业、数字地球以及广告摄影等领域，并在这些领域有着广阔的市场需求。", "dataHash": "fm-doc-id-aa5e43042e346f58"}], "knowledgeCategory": "事实性", "cognitiveDimension": "理解"}, {"id": "7989338958046234390_n9", "label": "无人机测绘的优势", "level": 1, "dataHash": "fm-doc-id-154199874e7a9494", "knowledgeCategory": "概念性", "cognitiveDimension": "理解", "tags": "重点"}, {"id": "7989338958046234390_n10", "label": "安全性和可靠性", "level": 2, "dataHash": "fm-doc-id-df361b97caa8975a", "description": [{"text": "随着科学技术的进步，无人机技术已经有了较大的发展，在地形测量方面的可靠性已经有了较大的提高。在使用过程中，无人机可以充分发挥出无人机自身的优越性。不同于直升机等载人飞机，无人机的起落不需要专门的场地，在不同的地形中也可以正常运作，大大提高了无人机的使用效率。", "dataHash": "fm-doc-id-cd6d10c98c4693c1"}], "knowledgeCategory": "概念性", "cognitiveDimension": "理解"}, {"id": "7989338958046234390_n11", "label": "成本较低，数据处理费用少", "level": 2, "dataHash": "fm-doc-id-658d951ae366a91c", "description": [{"text": "无人机的控制系统相对简单，无人机的造价要远低于普通的航拍飞机，起降也没有固定场地的需求。利用无人机航空摄影技术进行数据处理时，总的费用较低，性价比较高。此外，无人机驾驶员只需在地面通过遥感系统来进行操作，因此无人机驾驶员上岗执照的获取较为简单，使得驾驶员的上岗时间缩短。无人机通常采用的材料都是轻质量的碳纤维复合材料，其后期的维修、保养也较为简单便捷。", "dataHash": "fm-doc-id-aeee9f1700b1d9c6"}], "knowledgeCategory": "概念性", "cognitiveDimension": "理解"}, {"id": "7989338958046234390_n12", "label": "机动灵活性", "level": 2, "dataHash": "fm-doc-id-a087d96367d409c7", "description": [{"text": "无人机相对于普通的航拍飞机而言，其体型更加娇小，升空的时间更短，不需要专门的升降起跑场地就可以快速升空，并且正常运行。通常情况下，在进行测量前会先给无人机制定出其在测量时的飞行路线，在进行测量时，无人机能够根据设定好的路线自动飞行。因其稳定性较好，不仅能够进行高强度的航拍工作，还能够提高航拍的准确性与精准度。由于无人机并不需要载人，在耗油量相同时，无人机与普通的航拍飞机相比能够飞得更远、飞的时间更长。", "dataHash": "fm-doc-id-7b005fb008ebf8e6"}], "knowledgeCategory": "概念性", "cognitiveDimension": "理解"}, {"id": "7989338958046234390_n13", "label": "高分辨率、多角度的影像", "level": 2, "dataHash": "fm-doc-id-4a35f66517db43e1", "description": [{"text": "", "dataHash": "fm-doc-id-9cf37b9374f2837a"}], "knowledgeCategory": "概念性", "cognitiveDimension": "理解"}, {"id": "7989338958046234390_n14", "label": "无人机测绘的不足", "level": 1, "dataHash": "fm-doc-id-d82142f8e09d14e6", "knowledgeCategory": "概念性", "cognitiveDimension": "理解", "tags": "重点"}, {"id": "7989338958046234390_n15", "label": "飞行不够平稳", "level": 2, "dataHash": "fm-doc-id-175805a3c8d969e0", "description": [{"text": "机体轻是无人机的一大优点，但由于无人机机体很轻，当飞行高度升高时，容易受高空风力的影响，飞行不稳定。在测绘领域的应用中，无人机飞行会受风向和风速的影响，而无法进行低空拍摄作业，或拍摄的遥感影像无法达到精度要求。一般情况下，只有增加飞机的自身重量才能提高无人机的抗风性能，然而这样就无法满足现实起降要求。如何解决测绘无人机的起降技术和抗风性能，是目前测绘无人机的关键问题。", "dataHash": "fm-doc-id-fcd1b4e91791b5f4"}], "knowledgeCategory": "概念性", "cognitiveDimension": "理解"}, {"id": "7989338958046234390_n16", "label": "传感器不够完善", "level": 2, "dataHash": "fm-doc-id-f7849c8290de9a07", "description": [{"text": "普通的无人机由于技术的限制和要求，尚不能搭载精度较高的传感器，这使得监测工作无法获取精度较高的信息和图像，无法满足大比例尺的测绘要求。", "dataHash": "fm-doc-id-874297a6404b971d"}], "knowledgeCategory": "概念性", "cognitiveDimension": "理解"}, {"id": "7989338958046234390_n17", "label": "对通信系统的依赖性大", "level": 2, "dataHash": "fm-doc-id-b3a67538095a9bc5", "description": [{"text": "由于无人机是通过技术人员进行操作，利用传感器的传递信号来实现和完成的，无人机的控制程序对通信系统的依赖程度很高。无人机对GPS和通信系统的依赖使黑客很容易通过编码程序来干扰无人机的正常飞行，引发安全问题。", "dataHash": "fm-doc-id-cbcea220c3094272"}], "knowledgeCategory": "概念性", "cognitiveDimension": "理解"}, {"id": "7989338958046234390_n18", "label": "测绘与国家安全", "level": 1, "dataHash": "fm-doc-id-77859252a702cbe0", "description": [{"text": "测绘活动涉及国家安全利益，地理信息更是被各国视为“国之利器，不可以示人”。我们一定要时刻警惕非法测绘，同时作为测绘地理信息行业工作者我们更应该做好保密工作，不可有一丝疏忽，切实维护国家地理信息数据安全。", "dataHash": "fm-doc-id-5887611d5f5ba770"}, {"text": "信息化时代，测绘地理信息与国家安全的关联度越来越大，在维护政治、经济、军事、科技和其他非传统领域国家安全中发挥着重要作用。", "dataHash": "fm-doc-id-ec1ebdf6585b4669"}, {"text": "测绘工作事关国家主权、安全和发展利益。长期以来，测绘一直被世界各国视为“国之利器，不可以示人”。测绘为现代战争提供实施远程精确打击的地理信息，是赢得战争主动权的基础性工具，是赢得现代高技术战争胜利的重要因素。", "dataHash": "fm-doc-id-63ad81e0ccd80ff7"}, {"text": "作为国家战略性信息资源的重要内容，地理信息特别是重要军事设施、国家重要基础设施等敏感信息一旦泄露，不可逆转。其长期的潜在危害难以估量，将会对国家安全和利益造成无法挽回的损失。", "dataHash": "fm-doc-id-4100c3a9f59912c1"}, {"text": "危害测绘地理信息安全的行为，主要有以下三点。", "dataHash": "fm-doc-id-02c4a3f8e68b0e00"}], "knowledgeCategory": "概念性", "cognitiveDimension": "理解", "tags": "重点;课程思政"}, {"id": "7989338958046234390_n19", "label": "涉密测绘地理信息成果管理不当", "level": 2, "dataHash": "fm-doc-id-c9dff1d4a0d882c7", "description": [{"text": "未按规定保管、使用、存储涉密测绘地理信息成果，可能造成国家秘密泄露，包括但不限于：擅自复制、转借或转让涉密测绘成果，涉密和非涉密环境交叉使用存储介质，处理、存储涉密测绘成果的计算机使用无线设备或连接互联网和其他公共网络。", "dataHash": "fm-doc-id-67464928e0ade1d3"}], "knowledgeCategory": "概念性", "cognitiveDimension": "理解", "tags": "课程思政"}, {"id": "7989338958046234390_n20", "label": "非法测绘", "level": 2, "dataHash": "fm-doc-id-6d8c8f744ba2fead", "description": [{"text": "非法测绘包括外国的组织或个人未经批准在中国领域和海域从事测绘活动，以及一些地图爱好者将自家门口的军事禁区在卫星地图上加以精准标记并上传到网络，这些都对中国地理信息安全构成了极大威胁。", "dataHash": "fm-doc-id-cf9bfed84f64bf1e"}], "knowledgeCategory": "概念性", "cognitiveDimension": "理解", "tags": "课程思政"}, {"id": "7989338958046234390_n21", "label": "问题地图", "level": 2, "dataHash": "fm-doc-id-cd4e6fc508764ec1", "description": [{"text": "错绘中国国界线、漏绘中国重要岛屿，或在地图上登载敏感，甚至涉密地理信息的问题地图，极大损害了国家主权、安全和利益。", "dataHash": "fm-doc-id-9a7ac99e47610976"}, {"text": "根据《中华人民共和国测绘法》第六十五条：", "dataHash": "fm-doc-id-beb7d16b7770c8ef"}, {"text": "“违反本法规定，地理信息生产、保管、利用单位未对属于国家秘密的地理信息的获取、持有、提供、利用情况进行登记、长期保存的，给予警告，责令改正，可以并处二十万元以下的罚款；泄露国家秘密的，责令停业整顿，并处降低测绘资质等级或者吊销测绘资质证书；构成犯罪的，依法追究刑事责任。", "dataHash": "fm-doc-id-47b76e05d16a7706"}, {"text": "“违反本法规定，获取、持有、提供、利用属于国家秘密的地理信息的，给予警告，责令停止违法行为，没收违法所得，可以并处违法所得二倍以下的罚款；对直接负责的主管人员和其他直接责任人员，依法给予处分；造成损失的，依法承担赔偿责任；构成犯罪的，依法追究刑事责任。”", "dataHash": "fm-doc-id-77999511e8d28171"}, {"text": "我们须时刻牢记，测绘地理信息安全事关国家的主权、安全和利益，容不得半点马虎。守护测绘地理信息安全是每个公民神圣的责任，我们要通过铸牢全民安全意识、凝聚全民智慧力量，切实构筑起新时代测绘地理信息安全的牢固防线。", "dataHash": "fm-doc-id-271fa9f6bcbc745b"}], "knowledgeCategory": "概念性", "cognitiveDimension": "理解", "tags": "课程思政"}], "edges": [{"source": "7989338958046234390", "target": "7989338958046234390_n1", "type": "父子", "description": "任务1 了解背景知识包含测量学知识介绍"}, {"source": "7989338958046234390", "target": "7989338958046234390_n2", "type": "父子", "description": "任务1 了解背景知识包含测量学的细分方向"}, {"source": "7989338958046234390_n2", "target": "7989338958046234390_n3", "type": "父子", "description": "测量学的细分方向包含大地测量学"}, {"source": "7989338958046234390_n2", "target": "7989338958046234390_n4", "type": "父子", "description": "测量学的细分方向包含地形测量学"}, {"source": "7989338958046234390_n2", "target": "7989338958046234390_n5", "type": "父子", "description": "测量学的细分方向包含摄影测量学"}, {"source": "7989338958046234390_n2", "target": "7989338958046234390_n6", "type": "父子", "description": "测量学的细分方向包含工程测量学"}, {"source": "7989338958046234390_n2", "target": "7989338958046234390_n7", "type": "父子", "description": "测量学的细分方向包含地图制图学"}, {"source": "7989338958046234390", "target": "7989338958046234390_n8", "type": "父子", "description": "任务1 了解背景知识包含测绘的应用方向"}, {"source": "7989338958046234390", "target": "7989338958046234390_n9", "type": "父子", "description": "任务1 了解背景知识包含无人机测绘的优势"}, {"source": "7989338958046234390_n9", "target": "7989338958046234390_n10", "type": "父子", "description": "无人机测绘的优势包含安全性和可靠性"}, {"source": "7989338958046234390_n9", "target": "7989338958046234390_n11", "type": "父子", "description": "无人机测绘的优势包含成本较低，数据处理费用少"}, {"source": "7989338958046234390_n9", "target": "7989338958046234390_n12", "type": "父子", "description": "无人机测绘的优势包含机动灵活性"}, {"source": "7989338958046234390_n9", "target": "7989338958046234390_n13", "type": "父子", "description": "无人机测绘的优势包含高分辨率、多角度的影像"}, {"source": "7989338958046234390", "target": "7989338958046234390_n14", "type": "父子", "description": "任务1 了解背景知识包含无人机测绘的不足"}, {"source": "7989338958046234390_n14", "target": "7989338958046234390_n15", "type": "父子", "description": "无人机测绘的不足包含飞行不够平稳"}, {"source": "7989338958046234390_n14", "target": "7989338958046234390_n16", "type": "父子", "description": "无人机测绘的不足包含传感器不够完善"}, {"source": "7989338958046234390_n14", "target": "7989338958046234390_n17", "type": "父子", "description": "无人机测绘的不足包含对通信系统的依赖性大"}, {"source": "7989338958046234390", "target": "7989338958046234390_n18", "type": "父子", "description": "任务1 了解背景知识包含测绘与国家安全"}, {"source": "7989338958046234390_n18", "target": "7989338958046234390_n19", "type": "父子", "description": "测绘与国家安全包含涉密测绘地理信息成果管理不当"}, {"source": "7989338958046234390_n18", "target": "7989338958046234390_n20", "type": "父子", "description": "测绘与国家安全包含非法测绘"}, {"source": "7989338958046234390_n18", "target": "7989338958046234390_n21", "type": "父子", "description": "测绘与国家安全包含问题地图"}]}}];
+
+const COL_W = 300;      // 层级横向间距
+const NODE_H = 62;      // 单节点占位高度
+const V_GAP = 16;       // 兄弟节点垂直间距
+const canvas = document.getElementById('canvas');
+const edgesSvg = document.getElementById('edges');
+const detail = document.getElementById('detail');
+const metaEl = document.getElementById('meta');
+
+let current = null;      // 当前数据集
+let nodeMap = {};        // id -> node
+let childrenMap = {};    // id -> [childId]
+let elMap = {};          // id -> DOM 元素（用于读取真实坐标画线）
+let collapsed = new Set();
+let selectedId = null;
+
+// 批注存储：按 lessonId 分组。{ [lessonId]: { nodes: {nodeId:{label,level,text}}, page: "" } }
+// 存在内存中（纯静态页，无需后端）。切换 lesson 不丢，复制时汇总所有有意见的 lesson。
+const feedback = {};
+function fbFor(lessonId) {
+  if (!feedback[lessonId]) feedback[lessonId] = { nodes: {}, page: "" };
+  return feedback[lessonId];
+}
+
+function buildTree(graph) {
+  nodeMap = {};
+  childrenMap = {};
+  graph.nodes.forEach(n => { nodeMap[n.id] = n; childrenMap[n.id] = []; });
+  graph.edges.forEach(e => {
+    if (childrenMap[e.source]) childrenMap[e.source].push(e.target);
+  });
+  // 根 = level 0，或无入边的节点
+  const hasParent = new Set(graph.edges.map(e => e.target));
+  return graph.nodes.filter(n => n.level === 0 || !hasParent.has(n.id)).map(n => n.id);
+}
+
+// 递归布局：用节点真实高度 node._h 计算占位，返回子树总高度，写入 node._x/_y。
+// node._y 为该节点顶端 y 坐标；节点垂直居中对齐其子树跨度。
+function layout(id, depth, cursorY) {
+  const node = nodeMap[id];
+  node._x = depth * COL_W;
+  const selfH = (node._h || NODE_H) + V_GAP;
+  const kids = collapsed.has(id) ? [] : childrenMap[id];
+  if (kids.length === 0) {
+    node._y = cursorY;
+    return selfH;
+  }
+  let y = cursorY;
+  let total = 0;
+  kids.forEach(k => {
+    const h = layout(k, depth + 1, y);
+    y += h; total += h;
+  });
+  // 父节点中心对齐首末子节点中心
+  const first = nodeMap[kids[0]];
+  const last = nodeMap[kids[kids.length - 1]];
+  const kidsMid = (first._y + (first._h || NODE_H) / 2 + last._y + (last._h || NODE_H) / 2) / 2;
+  node._y = kidsMid - (node._h || NODE_H) / 2;
+  // 子树可能比父节点自身矮，取较大者
+  return Math.max(total, selfH);
+}
+
+function render() {
+  // 清空旧节点（保留 svg）
+  [...canvas.querySelectorAll('.node')].forEach(n => n.remove());
+  elMap = {};
+  const roots = buildTree(current.graph);
+
+  // —— 阶段一：建节点并入 DOM（先不定位），测量真实高度 ——
+  Object.values(nodeMap).forEach(n => {
+    const el = document.createElement('div');
+    el.className = 'node' + (n.id === selectedId ? ' selected' : '');
+    el.dataset.level = n.level;
+    el.style.visibility = 'hidden';
+
+    const badges = [];
+    if (n.tags) badges.push(`<span class="badge tag">${n.tags}</span>`);
+    if (n.knowledgeCategory) badges.push(`<span class="badge">${n.knowledgeCategory}</span>`);
+    if (n.cognitiveDimension) badges.push(`<span class="badge">${n.cognitiveDimension}</span>`);
+
+    el.innerHTML = `<div class="label"><span class="dot"></span><span>${escapeHtml(n.label)}</span></div>` +
+                   (badges.length ? `<div class="badges">${badges.join('')}</div>` : '');
+
+    const kids = childrenMap[n.id];
+    if (kids && kids.length) {
+      const t = document.createElement('div');
+      t.className = 'toggle';
+      t.textContent = collapsed.has(n.id) ? '+' : '−';
+      t.onclick = (ev) => { ev.stopPropagation(); toggle(n.id); };
+      el.appendChild(t);
+    }
+    // 有意见的节点加标记
+    if (current && fbFor(current.lessonId).nodes[n.id]) {
+      const flag = document.createElement('div');
+      flag.className = 'cmt-flag';
+      flag.textContent = '✎';
+      flag.title = '该节点有修改意见';
+      el.appendChild(flag);
+    }
+    el.onclick = () => select(n.id);
+    canvas.appendChild(el);
+    elMap[n.id] = el;
+  });
+  // 测量真实高度/宽度写入 node._h / node._w
+  Object.values(nodeMap).forEach(n => {
+    n._h = elMap[n.id].offsetHeight;
+    n._w = elMap[n.id].offsetWidth;
+  });
+
+  // —— 阶段二：按真实高度布局 ——
+  let cursorY = 0;
+  roots.forEach(r => { cursorY += layout(r, 0, cursorY); });
+
+  // —— 阶段三：算内容包围盒 ——
+  let contentW = 0, contentH = 0;
+  Object.values(nodeMap).forEach(n => {
+    if (n._x === undefined) return;
+    contentW = Math.max(contentW, n._x + (n._w || 200));
+    contentH = Math.max(contentH, n._y + (n._h || NODE_H));
+  });
+
+  // 居中偏移：内容比视口小时居中，否则留固定边距
+  const wrap = canvas.parentElement;      // .canvas-wrap 视口
+  const PAD = 48;
+  const vw = wrap.clientWidth, vh = wrap.clientHeight;
+  const offsetX = Math.max(PAD, (vw - contentW) / 2);
+  const offsetY = Math.max(PAD, (vh - contentH) / 2);
+
+  // —— 阶段四：定位并显示 ——
+  Object.values(nodeMap).forEach(n => {
+    if (n._x === undefined) return;
+    const el = elMap[n.id];
+    el.style.left = (n._x + offsetX) + 'px';
+    el.style.top = (n._y + offsetY) + 'px';
+    el.style.visibility = 'visible';
+  });
+
+  // canvas 至少填满视口，内容超出时按内容+边距撑开
+  canvas.style.width = Math.max(vw, contentW + offsetX + PAD) + 'px';
+  canvas.style.height = Math.max(vh, contentH + offsetY + PAD) + 'px';
+  // 节点已定位，用真实坐标画线（消除偏移）
+  drawEdges();
+}
+
+function drawEdges() {
+  edgesSvg.innerHTML = '';
+  edgesSvg.setAttribute('width', canvas.style.width);
+  edgesSvg.setAttribute('height', canvas.style.height);
+  current.graph.edges.forEach(e => {
+    if (collapsed.has(e.source)) return;
+    const se = elMap[e.source], te = elMap[e.target];
+    if (!se || !te) return;
+    // 读取真实布局坐标：起点=父节点右边缘中点，终点=子节点左边缘中点
+    const x1 = se.offsetLeft + se.offsetWidth;
+    const y1 = se.offsetTop + se.offsetHeight / 2;
+    const x2 = te.offsetLeft;
+    const y2 = te.offsetTop + te.offsetHeight / 2;
+    const mx = (x1 + x2) / 2;
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`);
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', '#3a4761');
+    path.setAttribute('stroke-width', '1.6');
+    edgesSvg.appendChild(path);
+  });
+}
+
+function toggle(id) {
+  if (collapsed.has(id)) collapsed.delete(id); else collapsed.add(id);
+  render();
+}
+
+function select(id) {
+  selectedId = id;
+  render();
+  const n = nodeMap[id];
+  const chips = [];
+  chips.push(`<span class="chip">层级 ${n.level}</span>`);
+  if (n.knowledgeCategory) chips.push(`<span class="chip">${n.knowledgeCategory}</span>`);
+  if (n.cognitiveDimension) chips.push(`<span class="chip">${n.cognitiveDimension}</span>`);
+  if (n.tags) chips.push(`<span class="chip" style="color:var(--l0)">${n.tags}</span>`);
+
+  let html = '';
+  if (n.projectTitle) {
+    html += `<div class="proj-tag">📁 ${escapeHtml(n.projectTitle)}</div>`;
+  }
+  html += `<h2>${escapeHtml(n.label)}</h2>`;
+  if (n.dataHash) html += `<div class="node-hash"># ${n.dataHash}</div>`;
+  if (n.projectDataHash) html += `<div class="node-hash">项目 # ${n.projectDataHash}</div>`;
+  html += `<div class="dl">${chips.join('')}</div>`;
+
+  const desc = n.description || [];
+  if (desc.length) {
+    html += `<div class="sec-title">详细说明（${desc.length} 段）</div>`;
+    desc.forEach(d => {
+      html += `<div class="seg"><div class="txt">${escapeHtml(d.text)}</div>`;
+      if (d.sourceHashes && d.sourceHashes.length) {
+        // 合并段：列出全部源 hash（零丢失可追溯）
+        html += `<div class="hashes">` +
+          d.sourceHashes.map(s => `<div class="hash">${s.dataHash}</div>`).join('') +
+          `</div>`;
+      } else if (d.dataHash) {
+        html += `<div class="hash">${d.dataHash}</div>`;
+      }
+      html += `</div>`;
+    });
+  } else {
+    html += `<div class="sec-title">详细说明</div><div class="empty-hint">该节点为分类/主题节点，无独立正文说明。</div>`;
+  }
+
+  // 节点级批注编辑区
+  const existing = fbFor(current.lessonId).nodes[id];
+  html += `<div class="sec-title">修改意见（该节点）</div>` +
+    `<div class="cmt-box">` +
+    `<textarea id="nodeCmt" placeholder="写下对「${escapeHtml(n.label)}」的修改意见，例如：该节点应为 level 1 / 应删除 / 归类错误…">${existing ? escapeHtml(existing.text) : ''}</textarea>` +
+    `<div class="cmt-actions">` +
+    `<button class="btn primary" id="saveCmtBtn">保存意见</button>` +
+    (existing ? `<button class="btn ghost" id="delCmtBtn">删除</button><span class="cmt-saved">✓ 已记录</span>` : '') +
+    `</div></div>`;
+
+  detail.className = 'detail';
+  detail.innerHTML = html;
+
+  document.getElementById('saveCmtBtn').onclick = () => {
+    const txt = document.getElementById('nodeCmt').value.trim();
+    const store = fbFor(current.lessonId).nodes;
+    if (txt) {
+      store[id] = { label: n.label, level: n.level, text: txt };
+    } else {
+      delete store[id];
+    }
+    updateFbCount(); render(); select(id);
+    showToast(txt ? '已记录该节点意见' : '已清除该节点意见');
+  };
+  const delBtn = document.getElementById('delCmtBtn');
+  if (delBtn) delBtn.onclick = () => {
+    delete fbFor(current.lessonId).nodes[id];
+    updateFbCount(); render(); select(id);
+    showToast('已删除该节点意见');
+  };
+}
+
+function escapeHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// —— 反馈：计数、生成文本、复制 ——
+function countFeedback() {
+  let n = 0;
+  Object.values(feedback).forEach(f => {
+    n += Object.keys(f.nodes).length;
+    if (f.page && f.page.trim()) n += 1;
+  });
+  return n;
+}
+
+function updateFbCount() {
+  const c = countFeedback();
+  const el = document.getElementById('fbCount');
+  el.innerHTML = c ? `已添加 <b>${c}</b> 条意见` : '未添加意见';
+}
+
+function buildFeedbackText() {
+  // 汇总所有有意见的 lesson；只带定位信息 + 意见（正文由大模型自行读 json 定位）
+  const lines = ['# 知识图谱修改意见', ''];
+  let any = false;
+  Object.keys(feedback).forEach(lessonId => {
+    const f = feedback[lessonId];
+    const nodeIds = Object.keys(f.nodes);
+    const hasPage = f.page && f.page.trim();
+    if (!nodeIds.length && !hasPage) return;
+    any = true;
+    lines.push(`## 课程 lessonId: ${lessonId}`);
+    lines.push(`对应文件: output/knowledgegraph/${lessonId}.json`);
+    lines.push('');
+    if (nodeIds.length) {
+      lines.push('### 节点级意见');
+      nodeIds.forEach(nid => {
+        const c = f.nodes[nid];
+        lines.push(`- [节点 ${nid}]「${c.label}」(level ${c.level})`);
+        lines.push(`  意见: ${c.text}`);
+      });
+      lines.push('');
+    }
+    if (hasPage) {
+      lines.push('### 页面级意见');
+      lines.push(`- ${f.page.trim()}`);
+      lines.push('');
+    }
+  });
+  if (!any) return '';
+  lines.push('---');
+  lines.push('请据以上意见对相应 lesson 的 json 二次修改，改后用 validate.py 校验、render.py 重新渲染。');
+  return lines.join('\n');
+}
+
+function copyFeedback() {
+  const text = buildFeedbackText();
+  if (!text) { showToast('尚未添加任何修改意见'); return; }
+  const done = () => showToast('修改意见已复制，粘贴给大模型即可');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+  } else {
+    fallbackCopy(text, done);
+  }
+}
+
+function fallbackCopy(text, done) {
+  const ta = document.createElement('textarea');
+  ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); done(); }
+  catch (e) { showToast('复制失败，请手动选择'); }
+  document.body.removeChild(ta);
+}
+
+let toastTimer = null;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+function loadDataset(idx) {
+  current = DATASETS[idx];
+  collapsed = new Set();
+  selectedId = null;
+  detail.className = 'detail empty';
+  detail.textContent = '点击左侧任意节点查看详细内容';
+  const m = current.meta || {};
+  const rootNode = current.graph.nodes.find(n => n.level === 0) || {};
+  const dc = rootNode.displayCode;
+  metaEl.innerHTML =
+    (dc ? `<span>代码 <b>${escapeHtml(dc)}</b></span>` : '') +
+    `<span>课程 <b>${current.lessonId}</b></span>` +
+    (m.unitId ? `<span>单元 <b>${m.unitId}</b></span>` : '') +
+    (m.textbookId ? `<span>教材 <b>${m.textbookId}</b></span>` : '') +
+    `<span>节点 <b>${current.graph.nodes.length}</b></span>`;
+  // 同步当前课程的页面级意见到输入框
+  const pc = document.getElementById('pageComment');
+  if (pc) pc.value = fbFor(current.lessonId).page || '';
+  render();
+}
+
+// 初始化
+(function init() {
+  const sel = document.getElementById('lessonSelect');
+  if (DATASETS.length > 1) {
+    document.getElementById('switcher').style.display = 'flex';
+    DATASETS.forEach((d, i) => {
+      const o = document.createElement('option');
+      o.value = i;
+      const rootLabel = (d.graph.nodes.find(n => n.level === 0) || {}).label || d.lessonId;
+      o.textContent = `${d.lessonId} · ${rootLabel}`;
+      sel.appendChild(o);
+    });
+    sel.onchange = () => loadDataset(+sel.value);
+  }
+
+  // 页面级意见：实时写入当前课程
+  const pc = document.getElementById('pageComment');
+  pc.addEventListener('input', () => {
+    fbFor(current.lessonId).page = pc.value;
+    updateFbCount();
+  });
+  // 复制 / 清空
+  document.getElementById('copyBtn').onclick = copyFeedback;
+  document.getElementById('clearBtn').onclick = () => {
+    const c = countFeedback();
+    if (!c) { showToast('当前没有意见可清空'); return; }
+    if (!confirm(`确定清空全部 ${c} 条修改意见？`)) return;
+    Object.keys(feedback).forEach(k => delete feedback[k]);
+    pc.value = '';
+    updateFbCount(); render();
+    if (selectedId) select(selectedId);
+    showToast('已清空全部意见');
+  };
+
+  // 窗口尺寸变化时重新布局居中（防抖）
+  let rzTimer = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(rzTimer);
+    rzTimer = setTimeout(() => { if (current) render(); }, 150);
+  });
+
+  loadDataset(0);
+  updateFbCount();
+})();
+</script>
+</body>
+</html>
