@@ -1,0 +1,4 @@
+interface:
+  display_name: "Guidance Learning"
+  short_description: "Extract lesson KP lists from textbook markdown"
+  default_prompt: "Use $guidance-learning to extract KP markdown files from the textbook markdown folder."
